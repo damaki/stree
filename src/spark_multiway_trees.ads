@@ -23,15 +23,10 @@ is
 
    type Forest is private;
 
-   type Index_Type is new Ada.Containers.Count_Type
-     range 1 .. Ada.Containers.Count_Type'Last - 1;
+   type Cursor is new Ada.Containers.Count_Type
+     range 0 .. Ada.Containers.Count_Type'Last - 1;
 
-   subtype Extended_Index_Type is Index_Type'Base
-     range Index_Type'First - 1 .. Index_Type'Last;
-
-   type Cursor is record
-      Node : Extended_Index_Type := Extended_Index_Type'First;
-   end record;
+   subtype Index_Type is Cursor range 1 .. Cursor'Last;
 
    No_Element : constant Cursor;
 
@@ -92,32 +87,15 @@ is
         Global => null,
         Post => (if C = No_Element then not Has_Element'Result);
 
-      function Has_Element (F : Forest; I : Index_Type) return Boolean is
-        (Has_Element (F, Cursor'(Node => I)))
-      with
-        Global => null;
-
       function Element (F : Forest; C : Cursor) return Element_Type with
         Global => null,
         Pre => Has_Element (F, C);
-
-      function Element (F : Forest; I : Index_Type) return Element_Type is
-        (Element (F, Cursor'(Node => I)))
-      with
-        Global => null,
-        Pre => Has_Element (F, I);
 
       function Parent (F : Forest; C : Cursor) return Cursor with
         Global => null,
         Pre    => Has_Element (F, C),
         Post   => (if Parent'Result /= No_Element
                    then Has_Element (F, Parent'Result));
-
-      function Parent (F : Forest; I : Index_Type) return Cursor is
-        (Parent (F, Cursor'(Node => I)))
-      with
-        Global => null,
-        Pre    => Has_Element (F, I);
 
       function Child
         (F : Forest;
@@ -135,11 +113,11 @@ is
         Pre    => Has_Element (F, C),
         Post   => (if Is_Root'Result then Parent (F, C) = No_Element);
 
-      function Position (F : Forest; I : Index_Type) return Way_Type with
+      function Position (F : Forest; C : Cursor) return Way_Type with
         Ghost,
         Global => null,
-        Pre    => Has_Element (F, I)
-                  and then Parent (F, I) /= No_Element;
+        Pre    => Has_Element (F, C)
+                  and then Parent (F, C) /= No_Element;
 
       -----------
       -- Model --
@@ -153,21 +131,21 @@ is
       function Model (F : Forest; Root : Cursor) return Model_Type with
         Global => null,
         Pre    => Root /= No_Element
-                  and then Has_Element (F, Root.Node)
+                  and then Has_Element (F, Root)
                   and then Is_Root (F, Root),
         Post   =>
           --  The root is part of the tree
-          Model'Result (Root.Node).In_Tree
+          Model'Result (Root).In_Tree
 
           --  The path from the root to itself is empty
-          and then Last (Model'Result (Root.Node).Path) = 0
+          and then Last (Model'Result (Root).Path) = 0
 
           --  Non-root nodes are in the tree iff their parent is in the tree
           and then
             (for all I in Index_Type =>
-               (if I /= Root.Node and then Has_Element (F, I) then
+               (if I /= Root and then Has_Element (F, I) then
                   (if Parent (F, I) /= No_Element
-                      and then Model'Result (Parent (F, I).Node).In_Tree
+                      and then Model'Result (Parent (F, I)).In_Tree
                    then Model'Result (I).In_Tree
                    else not Model'Result (I).In_Tree)))
 
@@ -176,8 +154,8 @@ is
             (for all I in Index_Type =>
                (if Model'Result (I).In_Tree then
                   (for all W in Way_Type =>
-                     (if Child (F, Cursor'(Node => I), W) /= No_Element then
-                        Model'Result (Child (F, Cursor'(Node => I), W).Node)
+                     (if Child (F, I, W) /= No_Element then
+                        Model'Result (Child (F, I, W))
                           .In_Tree))))
 
           --  The path from the root to non-root tree nodes is equal to the
@@ -185,8 +163,8 @@ is
           --  node. For other nodes, the path is empty.
           and then
             (for all I in Index_Type =>
-               (if Model'Result (I).In_Tree and then I /= Root.Node
-                then Is_Add (Model'Result (Parent (F, I).Node).Path,
+               (if Model'Result (I).In_Tree and then I /= Root
+                then Is_Add (Model'Result (Parent (F, I)).Path,
                              Position (F, I),
                              Model'Result (I).Path)
                 else Last (Model'Result (I).Path) = 0))
@@ -284,20 +262,18 @@ is
 
 private
 
-   Empty : constant := Extended_Index_Type'First;
-
-   type Way_Array is array (Way_Type) of Extended_Index_Type;
+   type Way_Array is array (Way_Type) of Cursor;
 
    subtype Position_Type is Way_Type'Base
      range Way_Type'First - 1 .. Way_Type'Last;
 
    Top : constant Position_Type := Position_Type'First;
 
-   No_Element : constant Cursor := Cursor'(Node => Empty);
+   No_Element : constant Cursor := Cursor'First;
 
    type Node_Type is record
       Element  : aliased Element_Type;
-      Parent   : Extended_Index_Type;
+      Parent   : Cursor;
       Position : Position_Type;
       Ways     : Way_Array;
    end record;

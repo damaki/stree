@@ -38,21 +38,21 @@ is
       -----------------
 
       function Has_Element (F : Forest; C : Cursor) return Boolean is
-        (C.Node /= Empty and then Contains (F.Nodes, C.Node));
+        (C /= No_Element and then Contains (F.Nodes, C));
 
       -------------
       -- Element --
       -------------
 
       function Element (F : Forest; C : Cursor) return Element_Type is
-        (Element (F.Nodes, C.Node).Element);
+        (Element (F.Nodes, C).Element);
 
       ------------
       -- Parent --
       ------------
 
       function Parent (F : Forest; C : Cursor) return Cursor is
-        (Cursor'(Node => Element (F.Nodes, C.Node).Parent));
+        (Element (F.Nodes, C).Parent);
 
       -----------
       -- Child --
@@ -64,21 +64,21 @@ is
          W : Way_Type)
          return Cursor
       is
-        (Cursor'(Node => Element (F.Nodes, C.Node).Ways (W)));
+        (Element (F.Nodes, C).Ways (W));
 
       -------------
       -- Is_Root --
       -------------
 
       function Is_Root (F : Forest; C : Cursor) return Boolean is
-        (Has_Element (F, C) and then Element (F.Nodes, C.Node).Position = Top);
+        (Has_Element (F, C) and then Element (F.Nodes, C).Position = Top);
 
       --------------
       -- Position --
       --------------
 
-      function Position (F : Forest; I : Index_Type) return Way_Type is
-        (Element (F.Nodes, I).Position);
+      function Position (F : Forest; C : Cursor) return Way_Type is
+        (Element (F.Nodes, C).Position);
 
       -----------
       -- Model --
@@ -89,12 +89,12 @@ is
 
          type Boolean_Array is array (Index_Type) of Boolean;
 
-         function Next (Todo : Boolean_Array) return Extended_Index_Type with
-           Post => (if Next'Result = Empty
+         function Next (Todo : Boolean_Array) return Cursor with
+           Post => (if Next'Result = No_Element
                     then (for all T of Todo => not T)
                     else Todo (Next'Result));
 
-         function Next (Todo : Boolean_Array) return Extended_Index_Type is
+         function Next (Todo : Boolean_Array) return Cursor is
          begin
             for I in Todo'Range loop
                pragma Loop_Invariant (for all J in 1 .. I - 1 => not Todo (J));
@@ -103,7 +103,7 @@ is
                end if;
             end loop;
 
-            return Empty;
+            return No_Element;
          end Next;
 
          Todo : Boolean_Array := [others => False];
@@ -111,15 +111,15 @@ is
          Unseen : I_Sets.Set := All_Indexes;
 
          M : Model_Type;
-         I : Extended_Index_Type := Root.Node;
+         I : Cursor := Root;
 
       begin
          --  Insert the root node in the todo list
 
-         Todo (Root.Node)      := True;
-         M (Root.Node).In_Tree := True;
+         Todo (Root)      := True;
+         M (Root).In_Tree := True;
 
-         while I /= Empty loop
+         while I /= No_Element loop
             pragma Loop_Variant (Decreases => Length (Unseen));
 
             --  Node I is in the todo list and in the tree
@@ -154,26 +154,26 @@ is
               (for all J in Index_Type =>
                  (if Todo (J) then
                     (for all W of Element (F.Nodes, J).Ways =>
-                       (if W /= Empty then
+                       (if W /= No_Element then
                           not M (W).In_Tree and then not Todo (W)))));
 
             --  The root is in tree with an empty path
             pragma Loop_Invariant
-              (M (Root.Node).In_Tree and then Length (M (Root.Node).Path) = 0);
+              (M (Root).In_Tree and then Length (M (Root).Path) = 0);
 
             --  Non-root nodes in the tree don't have position Top and have a
             --  parent.
             pragma Loop_Invariant
               (for all J in Index_Type =>
-                 (if M (J).In_Tree and then J /= Root.Node
+                 (if M (J).In_Tree and then J /= Root
                   then Element (F.Nodes, J).Position /= Top
-                       and then Element (F.Nodes, J).Parent /= Empty));
+                       and then Element (F.Nodes, J).Parent /= No_Element));
 
             --  Non-root nodes are in the tree iff their parent is in the tree
             pragma Loop_Invariant
               (for all J in Index_Type =>
-                 (if M (J).In_Tree and then J /= Root.Node
-                  then Element (F.Nodes, J).Parent /= Empty
+                 (if M (J).In_Tree and then J /= Root
+                  then Element (F.Nodes, J).Parent /= No_Element
                        and then M (Element (F.Nodes, J).Parent).In_Tree));
 
             --  The path from the root to non-root tree nodes is equal to the
@@ -181,7 +181,7 @@ is
             --  the node. For all other nodes, the path is empty.
             pragma Loop_Invariant
               (for all J in Index_Type =>
-                 (if M (J).In_Tree and then J /= Root.Node
+                 (if M (J).In_Tree and then J /= Root
                   then Is_Add (M (Element (F.Nodes, J).Parent).Path,
                                Element (F.Nodes, J).Position,
                                M (J).Path)));
@@ -192,8 +192,8 @@ is
             --  in the todo list.
             pragma Loop_Invariant
               (for all J in Index_Type =>
-                 (if J /= Root.Node and then Contains (F.Nodes, J) then
-                    (if Element (F.Nodes, J).Parent /= Empty
+                 (if J /= Root and then Contains (F.Nodes, J) then
+                    (if Element (F.Nodes, J).Parent /= No_Element
                         and then M (Element (F.Nodes, J).Parent).In_Tree
                      then M (J).In_Tree
                           or else Todo (Element (F.Nodes, J).Parent)
@@ -203,7 +203,7 @@ is
             --  Todo list.
             pragma Loop_Invariant
               (for all J in Index_Type =>
-                 (if M (J).In_Tree and then J /= Root.Node
+                 (if M (J).In_Tree and then J /= Root
                   then not Todo (Element (F.Nodes, J).Parent)));
 
             --  Nodes in the tree all have different associated paths
@@ -243,7 +243,7 @@ is
                --  way taken to the node.
                pragma Loop_Invariant
                  (for all V in Way_Type'First .. W - 1 =>
-                    (if Element (F.Nodes, I).Ways (V) /= Empty then
+                    (if Element (F.Nodes, I).Ways (V) /= No_Element then
                        M (Element (F.Nodes, I).Ways (V)).In_Tree
                        and then Todo (Element (F.Nodes, I).Ways (V))
                        and then M (Element (F.Nodes, I).Ways (V)).Path
@@ -267,10 +267,10 @@ is
                           and then Todo (J) = Todo'Loop_Entry (J)));
 
                declare
-                  J : constant Extended_Index_Type :=
+                  J : constant Cursor :=
                         Element (F.Nodes, I).Ways (W);
                begin
-                  if J /= Empty then
+                  if J /= No_Element then
                      pragma Assert (Element (F.Nodes, J).Parent = I);
                      pragma Assert (not Is_Empty (Unseen));
 
@@ -298,7 +298,7 @@ is
         (F : Forest; R : Cursor; C : Cursor)
          return Boolean
       is
-        (Model (F, R) (C.Node).In_Tree);
+        (Model (F, R) (C).In_Tree);
 
       -----------
       -- Depth --
@@ -309,7 +309,7 @@ is
          return Ada.Containers.Count_Type
       is
         (Ada.Containers.Count_Type
-           (To_Integer (Length (Model (F, R) (C.Node).Path))));
+           (To_Integer (Length (Model (F, R) (C).Path))));
 
       -----------------
       -- All_Indexes --
@@ -341,8 +341,8 @@ is
      (Container : Forest;
       Position  : Cursor) return Boolean
    is
-     (Position.Node /= Empty
-      and then Contains (Container.Nodes, Position.Node));
+     (Position /= No_Element
+      and then Contains (Container.Nodes, Position));
 
    -------------
    -- Element --
@@ -354,7 +354,7 @@ is
       return Element_Type
    is
       E_Acc : constant access constant Node_Type :=
-                  Constant_Reference (Container.Nodes, Position.Node);
+                  Constant_Reference (Container.Nodes, Position);
    begin
       return E_Acc.all.Element;
    end Element;
@@ -369,7 +369,7 @@ is
       return Boolean
    is
       E_Acc : constant access constant Node_Type :=
-                Constant_Reference (Container.Nodes, Position.Node);
+                Constant_Reference (Container.Nodes, Position);
    begin
       return E_Acc.all.Position = Top;
    end Is_Root;
@@ -384,9 +384,9 @@ is
       return Cursor
    is
       E_Acc : constant access constant Node_Type :=
-                Constant_Reference (Container.Nodes, Position.Node);
+                Constant_Reference (Container.Nodes, Position);
    begin
-      return Cursor'(Node => E_Acc.all.Parent);
+      return E_Acc.all.Parent;
    end Parent;
 
    -----------
@@ -400,16 +400,16 @@ is
       return Cursor
    is
       E_Acc : constant access constant Node_Type :=
-                Constant_Reference (Container.Nodes, Position.Node);
+                Constant_Reference (Container.Nodes, Position);
    begin
-      return Cursor'(Node => E_Acc.all.Ways (Way));
+      return E_Acc.all.Ways (Way);
    end Child;
 
    function Constant_Reference
      (Container : Forest;
       Position  : Cursor) return not null access constant Element_Type
    is
-     (Constant_Reference (Container.Nodes, Position.Node).all.Element'Access);
+     (Constant_Reference (Container.Nodes, Position).all.Element'Access);
 
    --------------------
    -- Tree_Structure --
@@ -417,18 +417,19 @@ is
 
    function Tree_Structure (F : Node_Maps.Map) return Boolean is
      (
-      --  The parent of a node is either Empty or references another, valid
-      --  node.
+      --  The parent of a node is either No_Element or references another,
+      --  valid node.
       (for all I in Index_Type =>
-         (if Contains (F, I) and then Element (F, I).Parent /= Empty
+         (if Contains (F, I) and then Element (F, I).Parent /= No_Element
           then Contains (F, Element (F, I).Parent)))
 
-      --  Each way of a node is either Empty or references another, valid node.
+      --  Each way of a node is either No_Element or references another,
+      --  valid node.
       and then
         (for all I in Index_Type =>
            (if Contains (F, I) then
               (for all W of Element (F, I).Ways =>
-                 (if W /= Empty then Contains (F, W)))))
+                 (if W /= No_Element then Contains (F, W)))))
 
       --  If a node has position Top then it has no parent, otherwise it
       --  has a valid parent
@@ -436,8 +437,8 @@ is
         (for all I in Index_Type =>
            (if Contains (F, I) then
               (if Element (F, I).Position = Top
-               then Element (F, I).Parent = Empty
-               else Element (F, I).Parent /= Empty
+               then Element (F, I).Parent = No_Element
+               else Element (F, I).Parent /= No_Element
                     and then Contains (F, Element (F, I).Parent))))
 
       --  If a node is a child (has a position), then it is the child of its
@@ -453,7 +454,7 @@ is
         (for all I in Index_Type =>
            (if Contains (F, I) then
               (for all W in Way_Type =>
-                 (if Element (F, I).Ways (W) /= Empty then
+                 (if Element (F, I).Ways (W) /= No_Element then
                     Element (F, Element (F, I).Ways (W)).Position = W
                     and then Element (F, Element (F, I).Ways (W)).Parent
                              = I))))
