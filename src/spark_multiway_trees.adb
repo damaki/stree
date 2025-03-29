@@ -235,34 +235,51 @@ is
 
             Unseen := Remove (Unseen, I);
 
-            declare
-               J : Extended_Index_Type;
-            begin
-               J := Element (F.Nodes, I).Ways (1);
-               if J /= Empty then
-                  pragma Assert
-                    (Element (F.Nodes, Element (F.Nodes, I).Ways (1)).Parent
-                     = I);
-                  pragma Assert (not Is_Empty (Unseen));
+            --  Add each child to the tree and the todo list
 
-                  Todo (J) := True;
-                  M (J)    := (In_Tree => True,
-                               Path    => Add (M (I).Path, 1));
-               end if;
-            end;
+            for W in Way_Type loop
+               --  All children processed so far are in the tree and in the
+               --  todo list, and its path extends its parent path by the
+               --  way taken to the node.
+               pragma Loop_Invariant
+                 (for all V in Way_Type'First .. W - 1 =>
+                    (if Element (F.Nodes, I).Ways (V) /= Empty then
+                       M (Element (F.Nodes, I).Ways (V)).In_Tree
+                       and then Todo (Element (F.Nodes, I).Ways (V))
+                       and then M (Element (F.Nodes, I).Ways (V)).Path
+                                = Add (M (I).Path, V)));
 
-            declare
-               J : Extended_Index_Type;
-            begin
-               J := Element (F.Nodes, I).Ways (2);
-               if J /= Empty then
-                  pragma Assert (not Is_Empty (Unseen));
+               --  Nodes in the tree all have different associated paths
+               pragma Loop_Invariant
+                 (for all J in Index_Type =>
+                    (if M (J).In_Tree then
+                       (for all K in Index_Type =>
+                          (if M (K).In_Tree and then M (K).Path = M (J).Path
+                             then J = K))));
 
-                  Todo (J) := True;
-                  M (J)    := (In_Tree => True,
-                               Path    => Add (M (I).Path, 2));
-               end if;
-            end;
+               --  All nodes that have not been seen as a child of I are
+               --  unchanged in the tree and todo list.
+               pragma Loop_Invariant
+                 (for all J in Index_Type =>
+                    (if (for all V in Way_Type'First .. W - 1 =>
+                           Element (F.Nodes, I).Ways (V) /= J)
+                     then M (J) = M'Loop_Entry (J)
+                          and then Todo (J) = Todo'Loop_Entry (J)));
+
+               declare
+                  J : constant Extended_Index_Type :=
+                        Element (F.Nodes, I).Ways (W);
+               begin
+                  if J /= Empty then
+                     pragma Assert (Element (F.Nodes, J).Parent = I);
+                     pragma Assert (not Is_Empty (Unseen));
+
+                     Todo (J) := True;
+                     M (J)    := (In_Tree => True,
+                                  Path    => Add (M (I).Path, W));
+                  end if;
+               end;
+            end loop;
 
             --  Nothing more to do for node I
 
