@@ -290,6 +290,27 @@ is
          return M;
       end Model;
 
+      ------------------
+      -- Is_Reachable --
+      ------------------
+
+      function Is_Reachable
+        (F : Forest; R : Cursor; C : Cursor)
+         return Boolean
+      is
+        (Model (F, R) (C.Node).In_Tree);
+
+      -----------
+      -- Depth --
+      -----------
+
+      function Depth
+        (F : Forest; R : Cursor; C : Cursor)
+         return Ada.Containers.Count_Type
+      is
+        (Ada.Containers.Count_Type
+           (To_Integer (Length (Model (F, R) (C.Node).Path))));
+
       -----------------
       -- All_Indexes --
       -----------------

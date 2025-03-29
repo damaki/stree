@@ -52,7 +52,9 @@ is
 
       Max_Size : constant := (Index_Type'Last - Index_Type'First) + 1;
 
-      type Positive_Count_Type is range 1 .. Max_Size + 1;
+      subtype Positive_Count_Type is Ada.Containers.Count_Type
+        range 1 .. Max_Size;
+
       package Way_Seqs is new SPARK.Containers.Functional.Vectors
         (Positive_Count_Type, Way_Type);
       use Way_Seqs;
@@ -169,6 +171,15 @@ is
                    then Model'Result (I).In_Tree
                    else not Model'Result (I).In_Tree)))
 
+          --  If a node is in the tree, then its children are also in the tree
+          and then
+            (for all I in Index_Type =>
+               (if Model'Result (I).In_Tree then
+                  (for all W in Way_Type =>
+                     (if Child (F, Cursor'(Node => I), W) /= No_Element then
+                        Model'Result (Child (F, Cursor'(Node => I), W).Node)
+                          .In_Tree))))
+
           --  The path from the root to non-root tree nodes is equal to the
           --  path to their parent extended by the last direction to get to the
           --  node. For other nodes, the path is empty.
@@ -193,6 +204,25 @@ is
           and then
             (for all I in Index_Type =>
                (if Model'Result (I).In_Tree then Has_Element (F, I)));
+
+      function Is_Reachable
+        (F : Forest; R : Cursor; C : Cursor)
+         return Boolean
+      with
+        Global => null,
+        Pre    => Has_Element (F, R)
+                  and then Has_Element (F, C)
+                  and then Is_Root (F, R);
+
+      function Depth
+        (F : Forest; R : Cursor; C : Cursor)
+         return Ada.Containers.Count_Type
+      with
+        Global => null,
+        Pre    => Has_Element (F, R)
+                  and then Has_Element (F, C)
+                  and then Is_Root (F, R)
+                  and then Is_Reachable (F, R, C);
 
    end Formal_Model;
 
