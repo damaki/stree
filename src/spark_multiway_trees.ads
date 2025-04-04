@@ -26,7 +26,7 @@ is
    type Cursor is new Ada.Containers.Count_Type
      range 0 .. Ada.Containers.Count_Type'Last - 1;
 
-   subtype Index_Type is Cursor range 1 .. Cursor'Last;
+   subtype Valid_Cursor_Range is Cursor range 1 .. Cursor'Last;
 
    No_Element : constant Cursor;
 
@@ -45,7 +45,8 @@ is
       -- Paths --
       -----------
 
-      Max_Size : constant := (Index_Type'Last - Index_Type'First) + 1;
+      Max_Size : constant :=
+        (Valid_Cursor_Range'Last - Valid_Cursor_Range'First) + 1;
 
       subtype Positive_Count_Type is Ada.Containers.Count_Type
         range 1 .. Max_Size;
@@ -123,7 +124,7 @@ is
       -- Model --
       -----------
 
-      type Model_Type is array (Index_Type) of Path_Type with
+      type Model_Type is array (Valid_Cursor_Range) of Path_Type with
         Predicate =>
           (for all P of Model_Type =>
              Way_Seqs.Length (P.Path) < Big_Integer'(Max_Size));
@@ -142,7 +143,7 @@ is
 
           --  Non-root nodes are in the tree iff their parent is in the tree
           and then
-            (for all I in Index_Type =>
+            (for all I in Valid_Cursor_Range =>
                (if I /= Root and then Has_Element (F, I) then
                   (if Parent (F, I) /= No_Element
                       and then Model'Result (Parent (F, I)).In_Tree
@@ -151,7 +152,7 @@ is
 
           --  If a node is in the tree, then its children are also in the tree
           and then
-            (for all I in Index_Type =>
+            (for all I in Valid_Cursor_Range =>
                (if Model'Result (I).In_Tree then
                   (for all W in Way_Type =>
                      (if Child (F, I, W) /= No_Element then
@@ -162,7 +163,7 @@ is
           --  path to their parent extended by the last direction to get to the
           --  node. For other nodes, the path is empty.
           and then
-            (for all I in Index_Type =>
+            (for all I in Valid_Cursor_Range =>
                (if Model'Result (I).In_Tree and then I /= Root
                 then Is_Add (Model'Result (Parent (F, I)).Path,
                              Position (F, I),
@@ -171,16 +172,16 @@ is
 
           --  Nodes in the tree all have different associated paths
           and then
-            (for all I in Index_Type =>
+            (for all I in Valid_Cursor_Range =>
                (if Model'Result (I).In_Tree then
-                  (for all J in Index_Type =>
+                  (for all J in Valid_Cursor_Range =>
                      (if Model'Result (J).In_Tree
                          and then Model'Result (J).Path = Model'Result (I).Path
                       then J = I))))
 
           --  All nodes in the tree map to a valid element
           and then
-            (for all I in Index_Type =>
+            (for all I in Valid_Cursor_Range =>
                (if Model'Result (I).In_Tree then Has_Element (F, I)));
 
       function Is_Reachable
@@ -279,7 +280,7 @@ private
    end record;
 
    package Node_Maps is new SPARK.Containers.Formal.Unbounded_Ordered_Maps
-     (Key_Type     => Index_Type,
+     (Key_Type     => Valid_Cursor_Range,
       Element_Type => Node_Type,
       "<"          => "<",
       "="          => "=");

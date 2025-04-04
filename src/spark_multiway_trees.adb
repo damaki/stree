@@ -12,11 +12,12 @@ is
 
    package body Formal_Model is
 
-      package I_Sets is new SPARK.Containers.Functional.Sets (Index_Type, "=");
+      package I_Sets is new SPARK.Containers.Functional.Sets
+        (Valid_Cursor_Range, "=");
 
       function All_Indexes return I_Sets.Set with
         Global => null,
-        Post   => (for all I in Index_Type =>
+        Post   => (for all I in Valid_Cursor_Range =>
                      I_Sets.Contains (All_Indexes'Result, I))
                   and then I_Sets.Length (All_Indexes'Result)
                            = To_Big_Integer (Max_Size);
@@ -87,7 +88,7 @@ is
       function Model (F : Forest; Root : Cursor) return Model_Type is
          use I_Sets;
 
-         type Boolean_Array is array (Index_Type) of Boolean;
+         type Boolean_Array is array (Valid_Cursor_Range) of Boolean;
 
          function Next (Todo : Boolean_Array) return Cursor with
            Post => (if Next'Result = No_Element
@@ -127,31 +128,31 @@ is
 
             --  All nodes in the todo list are in the tree
             pragma Loop_Invariant
-              (for all J in Index_Type =>
+              (for all J in Valid_Cursor_Range =>
                  (if Todo (J) then M (J).In_Tree));
 
             --  All nodes in the tree are in the forest
             pragma Loop_Invariant
-              (for all J in Index_Type =>
+              (for all J in Valid_Cursor_Range =>
                  (if M (J).In_Tree then Contains (F.Nodes, J)));
 
             --  All nodes in the todo list are in the forest
             pragma Loop_Invariant
-              (for all J in Index_Type =>
+              (for all J in Valid_Cursor_Range =>
                  (if Todo (J) then Contains (F.Nodes, J)));
 
             --  The path of a node in the todo list is maximal w.r.t. other
             --  nodes which are known to be in the tree at this stage.
             pragma Loop_Invariant
-              (for all J in Index_Type =>
+              (for all J in Valid_Cursor_Range =>
                  (if Todo (J) then
-                    (for all K in Index_Type =>
+                    (for all K in Valid_Cursor_Range =>
                        (if M (K).In_Tree
                         then not (M (J).Path < M (K).Path)))));
 
             --  Children of nodes in the todo list are not yet in the tree
             pragma Loop_Invariant
-              (for all J in Index_Type =>
+              (for all J in Valid_Cursor_Range =>
                  (if Todo (J) then
                     (for all W of Element (F.Nodes, J).Ways =>
                        (if W /= No_Element then
@@ -164,14 +165,14 @@ is
             --  Non-root nodes in the tree don't have position Top and have a
             --  parent.
             pragma Loop_Invariant
-              (for all J in Index_Type =>
+              (for all J in Valid_Cursor_Range =>
                  (if M (J).In_Tree and then J /= Root
                   then Element (F.Nodes, J).Position /= Top
                        and then Element (F.Nodes, J).Parent /= No_Element));
 
             --  Non-root nodes are in the tree iff their parent is in the tree
             pragma Loop_Invariant
-              (for all J in Index_Type =>
+              (for all J in Valid_Cursor_Range =>
                  (if M (J).In_Tree and then J /= Root
                   then Element (F.Nodes, J).Parent /= No_Element
                        and then M (Element (F.Nodes, J).Parent).In_Tree));
@@ -180,7 +181,7 @@ is
             --  path to their parent extended by the last direction to get to
             --  the node. For all other nodes, the path is empty.
             pragma Loop_Invariant
-              (for all J in Index_Type =>
+              (for all J in Valid_Cursor_Range =>
                  (if M (J).In_Tree and then J /= Root
                   then Is_Add (M (Element (F.Nodes, J).Parent).Path,
                                Element (F.Nodes, J).Position,
@@ -191,7 +192,7 @@ is
             --  node is either known to be in the tree, or the parent is still
             --  in the todo list.
             pragma Loop_Invariant
-              (for all J in Index_Type =>
+              (for all J in Valid_Cursor_Range =>
                  (if J /= Root and then Contains (F.Nodes, J) then
                     (if Element (F.Nodes, J).Parent /= No_Element
                         and then M (Element (F.Nodes, J).Parent).In_Tree
@@ -202,35 +203,35 @@ is
             --  A node known to be in the tree does not have its parent in the
             --  Todo list.
             pragma Loop_Invariant
-              (for all J in Index_Type =>
+              (for all J in Valid_Cursor_Range =>
                  (if M (J).In_Tree and then J /= Root
                   then not Todo (Element (F.Nodes, J).Parent)));
 
             --  Nodes in the tree all have different associated paths
             pragma Loop_Invariant
-              (for all J in Index_Type =>
+              (for all J in Valid_Cursor_Range =>
                  (if M (J).In_Tree then
-                    (for all K in Index_Type =>
+                    (for all K in Valid_Cursor_Range =>
                        (if M (K).In_Tree and then M (K).Path = M (J).Path
                         then J = K))));
 
             --  The longest path stored so far is of size
             --  Max_Size - Length (Unseen) at most.
             pragma Loop_Invariant
-              (for all J in Index_Type =>
+              (for all J in Valid_Cursor_Range =>
                  (Length (M (J).Path)
                   <= To_Big_Integer (Max_Size) - Length (Unseen)));
 
             --  Nodes that have not been handled yet are either not in the tree
             --  or in the todo list.
             pragma Loop_Invariant
-              (for all J in Index_Type =>
+              (for all J in Valid_Cursor_Range =>
                  (Contains (Unseen, J)
                   = (not M (J).In_Tree or else Todo (J))));
 
             --  Every node not in the tree has no path
             pragma Loop_Invariant
-              (for all J in Index_Type =>
+              (for all J in Valid_Cursor_Range =>
                  (if not M (J).In_Tree then Length (M (J).Path) = 0));
 
             Unseen := Remove (Unseen, I);
@@ -251,16 +252,16 @@ is
 
                --  Nodes in the tree all have different associated paths
                pragma Loop_Invariant
-                 (for all J in Index_Type =>
+                 (for all J in Valid_Cursor_Range =>
                     (if M (J).In_Tree then
-                       (for all K in Index_Type =>
+                       (for all K in Valid_Cursor_Range =>
                           (if M (K).In_Tree and then M (K).Path = M (J).Path
                              then J = K))));
 
                --  All nodes that have not been seen as a child of I are
                --  unchanged in the tree and todo list.
                pragma Loop_Invariant
-                 (for all J in Index_Type =>
+                 (for all J in Valid_Cursor_Range =>
                     (if (for all V in Way_Type'First .. W - 1 =>
                            Element (F.Nodes, I).Ways (V) /= J)
                      then M (J) = M'Loop_Entry (J)
@@ -319,11 +320,12 @@ is
          use I_Sets;
          S : I_Sets.Set;
       begin
-         for I in Index_Type loop
+         for I in Valid_Cursor_Range loop
             pragma Loop_Invariant (for all J in 1 .. I - 1 => Contains (S, J));
             pragma Loop_Invariant (for all J of S => J < I);
             pragma Loop_Invariant
-              (Length (S) = To_Big_Integer (Integer (I - Index_Type'First)));
+              (Length (S)
+               = To_Big_Integer (Integer (I - Valid_Cursor_Range'First)));
 
             S := Add (S, I);
          end loop;
@@ -419,14 +421,14 @@ is
      (
       --  The parent of a node is either No_Element or references another,
       --  valid node.
-      (for all I in Index_Type =>
+      (for all I in Valid_Cursor_Range =>
          (if Contains (F, I) and then Element (F, I).Parent /= No_Element
           then Contains (F, Element (F, I).Parent)))
 
       --  Each way of a node is either No_Element or references another,
       --  valid node.
       and then
-        (for all I in Index_Type =>
+        (for all I in Valid_Cursor_Range =>
            (if Contains (F, I) then
               (for all W of Element (F, I).Ways =>
                  (if W /= No_Element then Contains (F, W)))))
@@ -434,7 +436,7 @@ is
       --  If a node has position Top then it has no parent, otherwise it
       --  has a valid parent
       and then
-        (for all I in Index_Type =>
+        (for all I in Valid_Cursor_Range =>
            (if Contains (F, I) then
               (if Element (F, I).Position = Top
                then Element (F, I).Parent = No_Element
@@ -444,14 +446,14 @@ is
       --  If a node is a child (has a position), then it is the child of its
       --  parent.
       and then
-        (for all I in Index_Type =>
+        (for all I in Valid_Cursor_Range =>
            (if Contains (F, I) and then Element (F, I).Position /= Top then
               Element (F, Element (F, I).Parent).Ways (Element (F, I).Position)
                 = I))
 
       --  Every child of node I has I as its parent
       and then
-        (for all I in Index_Type =>
+        (for all I in Valid_Cursor_Range =>
            (if Contains (F, I) then
               (for all W in Way_Type =>
                  (if Element (F, I).Ways (W) /= No_Element then
