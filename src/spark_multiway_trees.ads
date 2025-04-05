@@ -99,7 +99,8 @@ is
    with
      Global => null,
      Pre => Has_Element (Container, Position),
-     Post => Element'Result = Formal_Model.Element (Container, Position);
+     Post => Formal_Model.Element_Logic_Equal
+               (Element'Result, Formal_Model.Element (Container, Position));
 
    function Is_Root
      (Container : Forest;
