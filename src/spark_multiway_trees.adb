@@ -12,16 +12,6 @@ is
 
    package body Formal_Model is
 
-      package I_Sets is new SPARK.Containers.Functional.Sets
-        (Valid_Cursor_Range, "=");
-
-      function All_Indexes return I_Sets.Set with
-        Global => null,
-        Post   => (for all I in Valid_Cursor_Range =>
-                     I_Sets.Contains (All_Indexes'Result, I))
-                  and then I_Sets.Length (All_Indexes'Result)
-                           = To_Big_Integer (Max_Size);
-
       -------------------------
       -- Element_Logic_Equal --
       -------------------------
@@ -80,6 +70,147 @@ is
 
       function Position (F : Forest; C : Cursor) return Way_Type is
         (Element (F.Nodes, C).Position);
+
+   end Formal_Model;
+
+   -----------------
+   -- Has_Element --
+   -----------------
+
+   function Has_Element
+     (Container : Forest;
+      Position  : Cursor) return Boolean
+   is
+     (Position /= No_Element
+      and then Contains (Container.Nodes, Position));
+
+   -------------
+   -- Element --
+   -------------
+
+   function Element
+     (Container : Forest;
+      Position  : Cursor)
+      return Element_Type
+   is
+      E_Acc : constant access constant Node_Type :=
+                  Constant_Reference (Container.Nodes, Position);
+   begin
+      return E_Acc.all.Element;
+   end Element;
+
+   -------------
+   -- Is_Root --
+   -------------
+
+   function Is_Root
+     (Container : Forest;
+      Position  : Cursor)
+      return Boolean
+   is
+      E_Acc : constant access constant Node_Type :=
+                Constant_Reference (Container.Nodes, Position);
+   begin
+      return E_Acc.all.Position = Top;
+   end Is_Root;
+
+   ------------
+   -- Parent --
+   ------------
+
+   function Parent
+     (Container : Forest;
+      Position  : Cursor)
+      return Cursor
+   is
+      E_Acc : constant access constant Node_Type :=
+                Constant_Reference (Container.Nodes, Position);
+   begin
+      return E_Acc.all.Parent;
+   end Parent;
+
+   -----------
+   -- Child --
+   -----------
+
+   function Child
+     (Container : Forest;
+      Position  : Cursor;
+      Way       : Way_Type)
+      return Cursor
+   is
+      E_Acc : constant access constant Node_Type :=
+                Constant_Reference (Container.Nodes, Position);
+   begin
+      return E_Acc.all.Ways (Way);
+   end Child;
+
+   function Constant_Reference
+     (Container : Forest;
+      Position  : Cursor) return not null access constant Element_Type
+   is
+     (Constant_Reference (Container.Nodes, Position).all.Element'Access);
+
+   package body Forest_Model is
+
+      package I_Sets is new SPARK.Containers.Functional.Sets
+        (Valid_Cursor_Range, "=");
+
+      function All_Indexes return I_Sets.Set with
+        Global => null,
+        Post   => (for all I in Valid_Cursor_Range =>
+                     I_Sets.Contains (All_Indexes'Result, I))
+                  and then I_Sets.Length (All_Indexes'Result)
+                           = To_Big_Integer (Forest_Model.Max_Size);
+
+      --------------------
+      -- Tree_Structure --
+      --------------------
+
+      function Tree_Structure (F : Node_Maps.Map) return Boolean is
+        (
+         --  The parent of a node is either No_Element or references another,
+         --  valid node.
+         (for all I in Valid_Cursor_Range =>
+            (if Contains (F, I) and then Element (F, I).Parent /= No_Element
+             then Contains (F, Element (F, I).Parent)))
+
+         --  Each way of a node is either No_Element or references another,
+         --  valid node.
+         and then
+           (for all I in Valid_Cursor_Range =>
+              (if Contains (F, I) then
+                 (for all W of Element (F, I).Ways =>
+                    (if W /= No_Element then Contains (F, W)))))
+
+         --  If a node has position Top then it has no parent, otherwise it
+         --  has a valid parent
+         and then
+           (for all I in Valid_Cursor_Range =>
+              (if Contains (F, I) then
+                (if Element (F, I).Position = Top
+                 then Element (F, I).Parent = No_Element
+                 else Element (F, I).Parent /= No_Element
+                      and then Contains (F, Element (F, I).Parent))))
+
+         --  If a node is a child (has a position), then it is the child of its
+         --  parent.
+         and then
+           (for all I in Valid_Cursor_Range =>
+              (if Contains (F, I) and then Element (F, I).Position /= Top then
+                 Element (F, Element (F, I).Parent)
+                   .Ways (Element (F, I).Position)
+                 = I))
+
+         --  Every child of node I has I as its parent
+         and then
+           (for all I in Valid_Cursor_Range =>
+              (if Contains (F, I) then
+                 (for all W in Way_Type =>
+                    (if Element (F, I).Ways (W) /= No_Element then
+                       Element (F, Element (F, I).Ways (W)).Position = W
+                       and then
+                         Element (F, Element (F, I).Ways (W)).Parent = I)))));
 
       -----------
       -- Model --
@@ -291,15 +422,15 @@ is
          return M;
       end Model;
 
-      ------------------
-      -- Is_Reachable --
-      ------------------
+      -------------
+      -- In_Tree --
+      -------------
 
-      function Is_Reachable
+      function In_Tree
         (F : Forest; R : Cursor; C : Cursor)
          return Boolean
       is
-        (Model (F, R) (C).In_Tree);
+        (Forest_Model.Model (F, R) (C).In_Tree);
 
       -----------
       -- Depth --
@@ -310,7 +441,7 @@ is
          return Ada.Containers.Count_Type
       is
         (Ada.Containers.Count_Type
-           (To_Integer (Length (Model (F, R) (C).Path))));
+           (To_Integer (Length (Forest_Model.Model (F, R) (C).Path))));
 
       -----------------
       -- All_Indexes --
@@ -333,133 +464,6 @@ is
          return S;
       end All_Indexes;
 
-   end Formal_Model;
-
-   -----------------
-   -- Has_Element --
-   -----------------
-
-   function Has_Element
-     (Container : Forest;
-      Position  : Cursor) return Boolean
-   is
-     (Position /= No_Element
-      and then Contains (Container.Nodes, Position));
-
-   -------------
-   -- Element --
-   -------------
-
-   function Element
-     (Container : Forest;
-      Position  : Cursor)
-      return Element_Type
-   is
-      E_Acc : constant access constant Node_Type :=
-                  Constant_Reference (Container.Nodes, Position);
-   begin
-      return E_Acc.all.Element;
-   end Element;
-
-   -------------
-   -- Is_Root --
-   -------------
-
-   function Is_Root
-     (Container : Forest;
-      Position  : Cursor)
-      return Boolean
-   is
-      E_Acc : constant access constant Node_Type :=
-                Constant_Reference (Container.Nodes, Position);
-   begin
-      return E_Acc.all.Position = Top;
-   end Is_Root;
-
-   ------------
-   -- Parent --
-   ------------
-
-   function Parent
-     (Container : Forest;
-      Position  : Cursor)
-      return Cursor
-   is
-      E_Acc : constant access constant Node_Type :=
-                Constant_Reference (Container.Nodes, Position);
-   begin
-      return E_Acc.all.Parent;
-   end Parent;
-
-   -----------
-   -- Child --
-   -----------
-
-   function Child
-     (Container : Forest;
-      Position  : Cursor;
-      Way       : Way_Type)
-      return Cursor
-   is
-      E_Acc : constant access constant Node_Type :=
-                Constant_Reference (Container.Nodes, Position);
-   begin
-      return E_Acc.all.Ways (Way);
-   end Child;
-
-   function Constant_Reference
-     (Container : Forest;
-      Position  : Cursor) return not null access constant Element_Type
-   is
-     (Constant_Reference (Container.Nodes, Position).all.Element'Access);
-
-   --------------------
-   -- Tree_Structure --
-   --------------------
-
-   function Tree_Structure (F : Node_Maps.Map) return Boolean is
-     (
-      --  The parent of a node is either No_Element or references another,
-      --  valid node.
-      (for all I in Valid_Cursor_Range =>
-         (if Contains (F, I) and then Element (F, I).Parent /= No_Element
-          then Contains (F, Element (F, I).Parent)))
-
-      --  Each way of a node is either No_Element or references another,
-      --  valid node.
-      and then
-        (for all I in Valid_Cursor_Range =>
-           (if Contains (F, I) then
-              (for all W of Element (F, I).Ways =>
-                 (if W /= No_Element then Contains (F, W)))))
-
-      --  If a node has position Top then it has no parent, otherwise it
-      --  has a valid parent
-      and then
-        (for all I in Valid_Cursor_Range =>
-           (if Contains (F, I) then
-              (if Element (F, I).Position = Top
-               then Element (F, I).Parent = No_Element
-               else Element (F, I).Parent /= No_Element
-                    and then Contains (F, Element (F, I).Parent))))
-
-      --  If a node is a child (has a position), then it is the child of its
-      --  parent.
-      and then
-        (for all I in Valid_Cursor_Range =>
-           (if Contains (F, I) and then Element (F, I).Position /= Top then
-              Element (F, Element (F, I).Parent).Ways (Element (F, I).Position)
-                = I))
-
-      --  Every child of node I has I as its parent
-      and then
-        (for all I in Valid_Cursor_Range =>
-           (if Contains (F, I) then
-              (for all W in Way_Type =>
-                 (if Element (F, I).Ways (W) /= No_Element then
-                    Element (F, Element (F, I).Ways (W)).Position = W
-                    and then Element (F, Element (F, I).Ways (W)).Parent
-                             = I))))
-     );
+   end Forest_Model;
 
 end SPARK_Multiway_Trees;
