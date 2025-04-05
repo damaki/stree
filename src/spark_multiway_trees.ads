@@ -83,6 +83,9 @@ is
 
    end Formal_Model;
 
+   function Is_Empty (Container : Forest) return Boolean with
+     Global => null;
+
    function Has_Element
      (Container : Forest;
       Position  : Cursor)

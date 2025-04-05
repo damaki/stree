@@ -73,6 +73,13 @@ is
 
    end Formal_Model;
 
+   --------------
+   -- Is_Empty --
+   --------------
+
+   function Is_Empty (Container : Forest) return Boolean is
+     (Is_Empty (Container.Nodes));
+
    -----------------
    -- Has_Element --
    -----------------
