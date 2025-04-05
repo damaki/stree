@@ -143,17 +143,12 @@ private
 
    type Way_Array is array (Way_Type) of Cursor;
 
-   subtype Position_Type is Way_Type'Base
-     range Way_Type'First - 1 .. Way_Type'Last;
-
-   Top : constant Position_Type := Position_Type'First;
-
    No_Element : constant Cursor := Cursor'First;
 
    type Node_Type is record
       Element  : aliased Element_Type;
       Parent   : Cursor;
-      Position : Position_Type;
+      Position : Way_Type;
       Ways     : Way_Array;
    end record;
 
@@ -186,7 +181,7 @@ private
          then Root = No_Element
          else Root /= No_Element
               and then Contains (Nodes, Root)
-              and then Element (Nodes, Root).Position = Top)
+              and then Element (Nodes, Root).Parent = No_Element)
       with
         Global => null;
 
@@ -302,7 +297,7 @@ private
         Global => null,
         Pre    => Tree_Structure (F.Nodes)
                   and then Forest_Root (F.Nodes, F.Root)
-                  and then H1as_Element (F, R)
+                  and then Has_Element (F, R)
                   and then Has_Element (F, C)
                   and then Is_Root (F, R);
 

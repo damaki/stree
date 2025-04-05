@@ -62,7 +62,7 @@ is
       -------------
 
       function Is_Root (F : Forest; C : Cursor) return Boolean is
-        (Has_Element (F, C) and then Element (F.Nodes, C).Position = Top);
+        (Element (F.Nodes, C).Parent = No_Element);
 
       --------------
       -- Position --
@@ -111,7 +111,7 @@ is
       E_Acc : constant access constant Node_Type :=
                 Constant_Reference (Container.Nodes, Position);
    begin
-      return E_Acc.all.Position = Top;
+      return E_Acc.all.Parent = No_Element;
    end Is_Root;
 
    ------------
@@ -183,24 +183,21 @@ is
                  (for all W of Element (F, I).Ways =>
                     (if W /= No_Element then Contains (F, W)))))
 
-         --  If a node has position Top then it has no parent, otherwise it
-         --  has a valid parent
+         --  If a node has a parent, then its parent is a valid node
          and then
            (for all I in Valid_Cursor_Range =>
               (if Contains (F, I) then
-                (if Element (F, I).Position = Top
-                 then Element (F, I).Parent = No_Element
-                 else Element (F, I).Parent /= No_Element
-                      and then Contains (F, Element (F, I).Parent))))
+                (if Element (F, I).Parent /= No_Element
+                 then Contains (F, Element (F, I).Parent))))
 
          --  If a node is a child (has a position), then it is the child of its
          --  parent.
          and then
            (for all I in Valid_Cursor_Range =>
-              (if Contains (F, I) and then Element (F, I).Position /= Top then
-                 Element (F, Element (F, I).Parent)
-                   .Ways (Element (F, I).Position)
-                 = I))
+              (if Contains (F, I) and then Element (F, I).Parent /= No_Element
+               then Element (F, Element (F, I).Parent)
+                      .Ways (Element (F, I).Position)
+                    = I))
 
          --  Every child of node I has I as its parent
          and then
@@ -293,13 +290,11 @@ is
             pragma Loop_Invariant
               (M (Root).In_Tree and then Length (M (Root).Path) = 0);
 
-            --  Non-root nodes in the tree don't have position Top and have a
-            --  parent.
+            --  Non-root nodes in the tree have a parent node
             pragma Loop_Invariant
               (for all J in Valid_Cursor_Range =>
                  (if M (J).In_Tree and then J /= Root
-                  then Element (F.Nodes, J).Position /= Top
-                       and then Element (F.Nodes, J).Parent /= No_Element));
+                  then Element (F.Nodes, J).Parent /= No_Element));
 
             --  Non-root nodes are in the tree iff their parent is in the tree
             pragma Loop_Invariant
