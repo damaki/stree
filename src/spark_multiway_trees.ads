@@ -11,7 +11,8 @@ with SPARK.Containers.Functional.Vectors;
 private with SPARK.Containers.Formal.Unbounded_Ordered_Maps;
 
 package SPARK_Multiway_Trees with
-  SPARK_Mode => On
+  SPARK_Mode => On,
+  Always_Terminates
 is
 
    use type Ada.Containers.Count_Type;
@@ -53,11 +54,11 @@ is
         Global => null,
         Pre => Has_Element (F, C);
 
-      function Parent (F : Forest; C : Cursor) return Cursor with
+      function Parent_Of (F : Forest; C : Cursor) return Cursor with
         Global => null,
         Pre    => Has_Element (F, C),
-        Post   => (if Parent'Result /= No_Element
-                   then Has_Element (F, Parent'Result));
+        Post   => (if Parent_Of'Result /= No_Element
+                   then Has_Element (F, Parent_Of'Result));
 
       function Child
         (F : Forest;
@@ -73,18 +74,45 @@ is
       function Is_Root (F : Forest; C : Cursor) return Boolean with
         Global => null,
         Pre    => Has_Element (F, C),
-        Post   => (if Is_Root'Result then Parent (F, C) = No_Element);
+        Post   => Is_Root'Result = (Parent_Of (F, C) = No_Element)
+                  and then (if not Is_Root'Result then
+                              Has_Element (F, Parent_Of (F, C)));
 
       function Position (F : Forest; C : Cursor) return Way_Type with
         Ghost,
         Global => null,
         Pre    => Has_Element (F, C)
-                  and then Parent (F, C) /= No_Element;
+                  and then Parent_Of (F, C) /= No_Element;
+
+      function Depth
+        (F : Forest; C : Cursor)
+         return Ada.Containers.Count_Type
+      with
+        Global => null,
+        Pre    => Has_Element (F, C);
+
+      function Is_Ancestor_Of
+        (Container : Forest;
+         Position  : Cursor;
+         Parent    : Cursor)
+         return Boolean
+      with
+        Global => null,
+        Pre    => Has_Element (Container, Position)
+                  and then Has_Element (Container, Parent),
+        Post   => (if Is_Ancestor_Of'Result then
+                     Depth (Container, Parent) < Depth (Container, Position));
 
    end Formal_Model;
 
    function Is_Empty (Container : Forest) return Boolean with
      Global => null;
+
+   function Root (Container : Forest) return Cursor with
+     Global => null,
+     Contract_Cases =>
+       (Is_Empty (Container)     => Root'Result = No_Element,
+        not Is_Empty (Container) => Has_Element (Container, Root'Result));
 
    function Has_Element
      (Container : Forest;
@@ -100,6 +128,7 @@ is
       Position  : Cursor)
       return Element_Type
    with
+     Inline,
      Global => null,
      Pre => Has_Element (Container, Position),
      Post => Formal_Model.Element_Logic_Equal
@@ -110,18 +139,31 @@ is
       Position  : Cursor)
       return Boolean
    with
+     Inline,
      Global => null,
      Pre  => Has_Element (Container, Position),
      Post => Is_Root'Result = Formal_Model.Is_Root (Container, Position);
 
-   function Parent
+   function Is_Ancestor_Of
+     (Container : Forest;
+      Position  : Cursor;
+      Parent    : Cursor)
+      return Boolean
+   with
+     Global => null,
+     Pre    => Has_Element (Container, Position)
+               and then Has_Element (Container, Parent),
+     Post   => Is_Ancestor_Of'Result = Formal_Model.Is_Ancestor_Of
+                                         (Container, Position, Parent);
+
+   function Parent_Of
      (Container : Forest;
       Position  : Cursor)
       return Cursor
    with
      Global => null,
      Pre => Has_Element (Container, Position),
-     Post => Parent'Result = Formal_Model.Parent (Container, Position);
+     Post => Parent_Of'Result = Formal_Model.Parent_Of (Container, Position);
 
    function Child
      (Container : Forest;
@@ -167,27 +209,39 @@ private
       Nodes : aliased Node_Maps.Map;
       Root  : Cursor := No_Element;
    end record with
-     Type_Invariant =>
-       Forest_Model.Tree_Structure (Nodes)
-       and then Forest_Model.Forest_Root (Nodes, Root);
+     Type_Invariant => Forest_Model.Tree_Invariant (Forest);
 
    package Forest_Model with Ghost is
 
       function Tree_Structure (F : Node_Maps.Map) return Boolean with
         Global => null;
 
-      function Forest_Root
-        (Nodes : Node_Maps.Map;
-         Root  : Cursor)
-         return Boolean
-      is
-        (if Is_Empty (Nodes)
-         then Root = No_Element
-         else Root /= No_Element
-              and then Contains (Nodes, Root)
-              and then Element (Nodes, Root).Parent = No_Element)
+      function Valid_Forest_Root (F : Forest) return Boolean is
+        (
+         --  Root is No_Element when the tree is empty, otherwise it references
+         --  a valid node and that node is a root.
+         (F.Root = No_Element) = Is_Empty (F.Nodes)
+         and then (if F.Root /= No_Element then
+                     Contains (F.Nodes, F.Root)
+                     and then Element (F.Nodes, F.Root).Parent = No_Element))
       with
         Global => null;
+
+      function All_Nodes_In_Tree
+        (F    : Node_Maps.Map;
+         Root : Cursor)
+         return Boolean
+      with
+        Global => null,
+        Pre    => Tree_Structure (F)
+                  and then (if Root /= No_Element then
+                              Contains (F, Root)
+                              and then Element (F, Root).Parent = No_Element);
+
+      function Tree_Invariant (F : Forest) return Boolean is
+        (Tree_Structure (F.Nodes)
+         and then Valid_Forest_Root (F)
+         and then All_Nodes_In_Tree (F.Nodes, F.Root));
 
       -----------
       -- Paths --
@@ -237,13 +291,12 @@ private
           (for all P of Model_Type =>
              Way_Seqs.Length (P.Path) < Big_Integer'(Max_Size));
 
-      function Model (F : Forest; Root : Cursor) return Model_Type with
+      function Model (F : Node_Maps.Map; Root : Cursor) return Model_Type with
         Global => null,
-        Pre    => Tree_Structure (F.Nodes)
-                  and then Forest_Root (F.Nodes, F.Root)
+        Pre    => Tree_Structure (F)
                   and then Root /= No_Element
-                  and then Has_Element (F, Root)
-                  and then Is_Root (F, Root),
+                  and then Contains (F, Root)
+                  and then Element (F, Root).Parent = No_Element,
         Post   =>
           --  The root is part of the tree
           Model'Result (Root).In_Tree
@@ -254,9 +307,9 @@ private
           --  Non-root nodes are in the tree iff their parent is in the tree
           and then
             (for all I in Valid_Cursor_Range =>
-               (if I /= Root and then Has_Element (F, I) then
-                  (if Parent (F, I) /= No_Element
-                      and then Model'Result (Parent (F, I)).In_Tree
+               (if I /= Root and then Contains (F, I) then
+                  (if Element (F, I).Parent /= No_Element
+                      and then Model'Result (Element (F, I).Parent).In_Tree
                    then Model'Result (I).In_Tree
                    else not Model'Result (I).In_Tree)))
 
@@ -265,9 +318,8 @@ private
             (for all I in Valid_Cursor_Range =>
                (if Model'Result (I).In_Tree then
                   (for all W in Way_Type =>
-                     (if Child (F, I, W) /= No_Element then
-                        Model'Result (Child (F, I, W))
-                          .In_Tree))))
+                     (if Element (F, I).Ways (W) /= No_Element then
+                        Model'Result (Element (F, I).Ways (W)).In_Tree))))
 
           --  The path from the root to non-root tree nodes is equal to the
           --  path to their parent extended by the last direction to get to the
@@ -275,8 +327,8 @@ private
           and then
             (for all I in Valid_Cursor_Range =>
                (if Model'Result (I).In_Tree and then I /= Root
-                then Is_Add (Model'Result (Parent (F, I)).Path,
-                             Element (F.Nodes, I).Position,
+                then Is_Add (Model'Result (Element (F, I).Parent).Path,
+                             Element (F, I).Position,
                              Model'Result (I).Path)
                 else Last (Model'Result (I).Path) = 0))
 
@@ -292,15 +344,14 @@ private
           --  All nodes in the tree map to a valid element
           and then
             (for all I in Valid_Cursor_Range =>
-               (if Model'Result (I).In_Tree then Has_Element (F, I)));
+               (if Model'Result (I).In_Tree then Contains (F, I)));
 
       function In_Tree
         (F : Forest; R : Cursor; C : Cursor)
          return Boolean
       with
         Global => null,
-        Pre    => Tree_Structure (F.Nodes)
-                  and then Forest_Root (F.Nodes, F.Root)
+        Pre    => Tree_Invariant (F)
                   and then Has_Element (F, R)
                   and then Has_Element (F, C)
                   and then Is_Root (F, R);
@@ -310,8 +361,7 @@ private
          return Ada.Containers.Count_Type
       with
         Global => null,
-        Pre    => Tree_Structure (F.Nodes)
-                  and then Forest_Root (F.Nodes, F.Root)
+        Pre    => Tree_Invariant (F)
                   and then Has_Element (F, R)
                   and then Has_Element (F, C)
                   and then Is_Root (F, R)

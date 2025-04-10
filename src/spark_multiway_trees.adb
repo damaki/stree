@@ -12,6 +12,8 @@ is
 
    package body Formal_Model is
 
+      use Forest_Model.Way_Seqs;
+
       -------------------------
       -- Element_Logic_Equal --
       -------------------------
@@ -38,11 +40,11 @@ is
       function Element (F : Forest; C : Cursor) return Element_Type is
         (Element (F.Nodes, C).Element);
 
-      ------------
-      -- Parent --
-      ------------
+      ---------------
+      -- Parent_Of --
+      ---------------
 
-      function Parent (F : Forest; C : Cursor) return Cursor is
+      function Parent_Of (F : Forest; C : Cursor) return Cursor is
         (Element (F.Nodes, C).Parent);
 
       -----------
@@ -71,6 +73,35 @@ is
       function Position (F : Forest; C : Cursor) return Way_Type is
         (Element (F.Nodes, C).Position);
 
+      -----------
+      -- Depth --
+      -----------
+
+      function Depth
+        (F : Forest; C : Cursor)
+         return Ada.Containers.Count_Type
+      is
+        (Ada.Containers.Count_Type
+          (To_Integer
+             (Length (Forest_Model.Model (F.Nodes, F.Root) (C).Path))));
+
+      --------------------
+      -- Is_Ancestor_Of --
+      --------------------
+
+      function Is_Ancestor_Of
+        (Container : Forest;
+         Position  : Cursor;
+         Parent    : Cursor)
+         return Boolean
+      is
+        (Forest_Model.In_Tree (Container, Container.Root, Position)
+         and then Forest_Model.In_Tree (Container, Container.Root, Parent)
+         and then
+           Forest_Model.Model (Container.Nodes, Container.Root) (Parent).Path
+           < Forest_Model.Model
+               (Container.Nodes, Container.Root) (Position).Path);
+
    end Formal_Model;
 
    --------------
@@ -79,6 +110,13 @@ is
 
    function Is_Empty (Container : Forest) return Boolean is
      (Is_Empty (Container.Nodes));
+
+   ----------
+   -- Root --
+   ----------
+
+   function Root (Container : Forest) return Cursor is
+     (Container.Root);
 
    -----------------
    -- Has_Element --
@@ -121,11 +159,59 @@ is
       return E_Acc.all.Parent = No_Element;
    end Is_Root;
 
-   ------------
-   -- Parent --
-   ------------
+   --------------------
+   -- Is_Ancestor_Of --
+   --------------------
 
-   function Parent
+   function Is_Ancestor_Of
+     (Container : Forest;
+      Position  : Cursor;
+      Parent    : Cursor)
+      return Boolean
+   is
+      use Forest_Model;
+      use Forest_Model.Way_Seqs;
+
+      M : constant Forest_Model.Model_Type :=
+                     Forest_Model.Model (Container.Nodes, Container.Root)
+                   with Ghost;
+
+      Node : Cursor;
+
+   begin
+      pragma Assert (M (Position).In_Tree);
+      pragma Assert (M (Parent).In_Tree);
+
+      if Is_Root (Container, Position) then
+         return False;
+      end if;
+
+      Node := Parent_Of (Container, Position);
+
+      while not Is_Root (Container, Node) and then Node /= Parent loop
+         pragma Loop_Variant
+           (Decreases => Formal_Model.Depth (Container, Node));
+
+         pragma Loop_Invariant (Node /= No_Element);
+         pragma Loop_Invariant (Has_Element (Container, Node));
+         pragma Loop_Invariant (M (Node).In_Tree);
+         pragma Loop_Invariant (M (Node).Path < M (Position).Path);
+         pragma Loop_Invariant (Parent_Of (Container, Node) /= No_Element);
+         pragma Loop_Invariant
+           (not (M (Node).Path <= M (Parent).Path
+                 and then M (Parent).Path < M (Position).Path));
+
+         Node := Parent_Of (Container, Node);
+      end loop;
+
+      return Node = Parent;
+   end Is_Ancestor_Of;
+
+   ---------------
+   -- Parent_Of --
+   ---------------
+
+   function Parent_Of
      (Container : Forest;
       Position  : Cursor)
       return Cursor
@@ -134,7 +220,7 @@ is
                 Constant_Reference (Container.Nodes, Position);
    begin
       return E_Acc.all.Parent;
-   end Parent;
+   end Parent_Of;
 
    -----------
    -- Child --
@@ -216,11 +302,24 @@ is
                        and then
                          Element (F, Element (F, I).Ways (W)).Parent = I)))));
 
+      -----------------------
+      -- All_Nodes_In_Tree --
+      -----------------------
+
+      function All_Nodes_In_Tree
+        (F    : Node_Maps.Map;
+         Root : Cursor)
+         return Boolean
+      is
+        (if Root /= No_Element then
+           (for all I in Valid_Cursor_Range =>
+              (Contains (F, I) = Model (F, Root) (I).In_Tree)));
+
       -----------
       -- Model --
       -----------
 
-      function Model (F : Forest; Root : Cursor) return Model_Type is
+      function Model (F : Node_Maps.Map; Root : Cursor) return Model_Type is
          use I_Sets;
 
          type Boolean_Array is array (Valid_Cursor_Range) of Boolean;
@@ -269,12 +368,12 @@ is
             --  All nodes in the tree are in the forest
             pragma Loop_Invariant
               (for all J in Valid_Cursor_Range =>
-                 (if M (J).In_Tree then Contains (F.Nodes, J)));
+                 (if M (J).In_Tree then Contains (F, J)));
 
             --  All nodes in the todo list are in the forest
             pragma Loop_Invariant
               (for all J in Valid_Cursor_Range =>
-                 (if Todo (J) then Contains (F.Nodes, J)));
+                 (if Todo (J) then Contains (F, J)));
 
             --  The path of a node in the todo list is maximal w.r.t. other
             --  nodes which are known to be in the tree at this stage.
@@ -289,7 +388,7 @@ is
             pragma Loop_Invariant
               (for all J in Valid_Cursor_Range =>
                  (if Todo (J) then
-                    (for all W of Element (F.Nodes, J).Ways =>
+                    (for all W of Element (F, J).Ways =>
                        (if W /= No_Element then
                           not M (W).In_Tree and then not Todo (W)))));
 
@@ -301,14 +400,14 @@ is
             pragma Loop_Invariant
               (for all J in Valid_Cursor_Range =>
                  (if M (J).In_Tree and then J /= Root
-                  then Element (F.Nodes, J).Parent /= No_Element));
+                  then Element (F, J).Parent /= No_Element));
 
             --  Non-root nodes are in the tree iff their parent is in the tree
             pragma Loop_Invariant
               (for all J in Valid_Cursor_Range =>
                  (if M (J).In_Tree and then J /= Root
-                  then Element (F.Nodes, J).Parent /= No_Element
-                       and then M (Element (F.Nodes, J).Parent).In_Tree));
+                  then Element (F, J).Parent /= No_Element
+                       and then M (Element (F, J).Parent).In_Tree));
 
             --  The path from the root to non-root tree nodes is equal to the
             --  path to their parent extended by the last direction to get to
@@ -316,8 +415,8 @@ is
             pragma Loop_Invariant
               (for all J in Valid_Cursor_Range =>
                  (if M (J).In_Tree and then J /= Root
-                  then Is_Add (M (Element (F.Nodes, J).Parent).Path,
-                               Element (F.Nodes, J).Position,
+                  then Is_Add (M (Element (F, J).Parent).Path,
+                               Element (F, J).Position,
                                M (J).Path)));
 
             --  A node known to be in the tree is either the root node, or a
@@ -326,11 +425,10 @@ is
             --  in the todo list.
             pragma Loop_Invariant
               (for all J in Valid_Cursor_Range =>
-                 (if J /= Root and then Contains (F.Nodes, J) then
-                    (if Element (F.Nodes, J).Parent /= No_Element
-                        and then M (Element (F.Nodes, J).Parent).In_Tree
-                     then M (J).In_Tree
-                          or else Todo (Element (F.Nodes, J).Parent)
+                 (if J /= Root and then Contains (F, J) then
+                    (if Element (F, J).Parent /= No_Element
+                        and then M (Element (F, J).Parent).In_Tree
+                     then M (J).In_Tree or else Todo (Element (F, J).Parent)
                      else not M (J).In_Tree)));
 
             --  A node known to be in the tree does not have its parent in the
@@ -338,7 +436,7 @@ is
             pragma Loop_Invariant
               (for all J in Valid_Cursor_Range =>
                  (if M (J).In_Tree and then J /= Root
-                  then not Todo (Element (F.Nodes, J).Parent)));
+                  then not Todo (Element (F, J).Parent)));
 
             --  Nodes in the tree all have different associated paths
             pragma Loop_Invariant
@@ -377,10 +475,10 @@ is
                --  way taken to the node.
                pragma Loop_Invariant
                  (for all V in Way_Type'First .. W - 1 =>
-                    (if Element (F.Nodes, I).Ways (V) /= No_Element then
-                       M (Element (F.Nodes, I).Ways (V)).In_Tree
-                       and then Todo (Element (F.Nodes, I).Ways (V))
-                       and then M (Element (F.Nodes, I).Ways (V)).Path
+                    (if Element (F, I).Ways (V) /= No_Element then
+                       M (Element (F, I).Ways (V)).In_Tree
+                       and then Todo (Element (F, I).Ways (V))
+                       and then M (Element (F, I).Ways (V)).Path
                                 = Add (M (I).Path, V)));
 
                --  Nodes in the tree all have different associated paths
@@ -396,16 +494,15 @@ is
                pragma Loop_Invariant
                  (for all J in Valid_Cursor_Range =>
                     (if (for all V in Way_Type'First .. W - 1 =>
-                           Element (F.Nodes, I).Ways (V) /= J)
+                           Element (F, I).Ways (V) /= J)
                      then M (J) = M'Loop_Entry (J)
                           and then Todo (J) = Todo'Loop_Entry (J)));
 
                declare
-                  J : constant Cursor :=
-                        Element (F.Nodes, I).Ways (W);
+                  J : constant Cursor := Element (F, I).Ways (W);
                begin
                   if J /= No_Element then
-                     pragma Assert (Element (F.Nodes, J).Parent = I);
+                     pragma Assert (Element (F, J).Parent = I);
                      pragma Assert (not Is_Empty (Unseen));
 
                      Todo (J) := True;
@@ -432,7 +529,7 @@ is
         (F : Forest; R : Cursor; C : Cursor)
          return Boolean
       is
-        (Forest_Model.Model (F, R) (C).In_Tree);
+        (Forest_Model.Model (F.Nodes, R) (C).In_Tree);
 
       -----------
       -- Depth --
@@ -443,7 +540,7 @@ is
          return Ada.Containers.Count_Type
       is
         (Ada.Containers.Count_Type
-           (To_Integer (Length (Forest_Model.Model (F, R) (C).Path))));
+           (To_Integer (Length (Forest_Model.Model (F.Nodes, R) (C).Path))));
 
       -----------------
       -- All_Indexes --
