@@ -83,23 +83,19 @@ is
    -- Length --
    ------------
 
-   ------------
-   -- Length --
-   ------------
-
    function Length (Container : Tree) return Count_Type is
      (Node_Vectors.Length (Container.Nodes));
 
-   ----------------
-     -- Is_Empty --
-   ----------------
+   --------------
+   -- Is_Empty --
+   --------------
 
    function Is_Empty (Container : Tree) return Boolean is
      (Container.Root = No_Element);
 
-   -------------------
-     -- Has_Element --
-   -------------------
+   -----------------
+   -- Has_Element --
+   -----------------
 
    function Has_Element
      (Container : Tree;
@@ -108,9 +104,9 @@ is
    is
      (Node_Vectors.Has_Element (Container.Nodes, Position.Node));
 
-   ---------------
-     -- Element --
-   ---------------
+   -------------
+   -- Element --
+   -------------
 
    function Element
      (Container : Tree;
@@ -119,9 +115,9 @@ is
    is
      (Node_Vectors.Element (Container.Nodes, Position.Node).Element);
 
-   ---------------
-     -- Is_Root --
-   ---------------
+   -------------
+   -- Is_Root --
+   -------------
 
    function Is_Root
      (Container : Tree;
@@ -131,9 +127,9 @@ is
      (not Is_Empty (Container)
       and then Position = Container.Root);
 
-   ----------------
-      -- Is_Leaf --
-   ----------------
+   -------------
+   -- Is_Leaf --
+   -------------
 
    function Is_Leaf
      (Container : Tree;
