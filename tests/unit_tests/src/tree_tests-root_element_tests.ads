@@ -13,7 +13,8 @@ package Tree_Tests.Root_Element_Tests is
 
    type Test_Fixture is new AUnit.Test_Fixtures.Test_Fixture with null record;
 
-   procedure Test_Root_Element (T : in out Test_Fixture);
+   procedure Test_Root_Element_Non_Empty (T : in out Test_Fixture);
+   procedure Test_Root_Element_Empty (T : in out Test_Fixture);
 
    procedure Add_To_Suite (S : in out Test_Suite'Class);
 
