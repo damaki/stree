@@ -601,11 +601,18 @@ is
       Position  : Cursor)
       return Way_Type
    is
-      Node_Acc : constant not null access constant Node_Type :=
-                   Node_Vectors.Constant_Reference
-                     (Container.Nodes, Position.Node);
    begin
-      return Node_Acc.all.Position;
+      if not Has_Element (Container, Position) then
+         return Way_Type'First;
+      end if;
+
+      declare
+         Node_Acc : constant not null access constant Node_Type :=
+                      Node_Vectors.Constant_Reference
+                        (Container.Nodes, Position.Node);
+      begin
+         return Node_Acc.all.Position;
+      end;
    end Direction;
 
    -----------------

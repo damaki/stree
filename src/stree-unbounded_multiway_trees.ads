@@ -701,8 +701,9 @@ is
    with
      Inline,
      Global => null,
-     Pre    => Has_Element (Container, Position),
-     Post   => Direction'Result = Model (Container) (Position.Node).Way;
+     Post   => Direction'Result = Model (Container) (Position.Node).Way
+               and then (if not Has_Element (Container, Position) then
+                           Direction'Result = Way_Type'First);
    --  Get the direction (way) to the node at the given Position from its
    --  parent node.
 
