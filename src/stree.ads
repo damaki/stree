@@ -8,5 +8,4 @@ package Stree with
   SPARK_Mode => On
 is
 
-
 end Stree;
