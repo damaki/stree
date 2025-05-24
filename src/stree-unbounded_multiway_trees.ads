@@ -318,6 +318,29 @@ is
         Post => (if M_Child'Result /= No_Element then
                    Has_Element (Container, M_Child'Result));
 
+      function M_Has_Child
+        (Container : Tree;
+         Position  : Cursor;
+         Way       : Way_Type)
+         return Boolean
+      is
+        (M_Child (Container, Position, Way) /= No_Element)
+      with
+        Global => null,
+        Pre  => Has_Element (Container, Position);
+
+      function M_Has_Sibling
+        (Container : Tree;
+         Position  : Cursor;
+         Way       : Way_Type)
+         return Boolean
+      is
+        (Has_Element (Container, Position)
+         and then not M_Is_Root (Container, Position)
+         and then M_Has_Child (Container, M_Parent (Container, Position), Way))
+      with
+        Global => null;
+
       function M_Is_Ancestor
         (Container : Tree;
          Ancestor  : Cursor;
@@ -353,6 +376,18 @@ is
       with
         Global => null;
 
+      function M_Is_Leaf
+        (Container : Tree;
+         Position  : Cursor)
+         return Boolean
+      is
+        (Position /= No_Element
+         and then Model (Container) (Position.Node).In_Tree
+         and then (for all C of Model (Container) (Position.Node).Children =>
+                     C = No_Element))
+      with
+        Global => null;
+
       function M_Equivalent_Trees (Left, Right : Tree) return Boolean is
         (Model (Left) = Model (Right));
       --  Left and Right have the same tree structure
@@ -379,19 +414,6 @@ is
                                             Element (Right, To_Cursor (I)))));
       --  Elements in Left are unchanged in Right, and at the same positions
 
-      function M_Elements_Unchanged_Except
-        (Left, Right : Tree;
-         Position    : Cursor)
-         return Boolean
-      is
-        (for all I in Positive_Count_Type =>
-           (if Model (Left) (I).In_Tree and then I /= Position.Node then
-              Model (Right) (I).In_Tree
-              and then Equivalent_Elements (Element (Left,  To_Cursor (I)),
-                                            Element (Right, To_Cursor (I)))));
-      --  Elements in Left are unchanged in Right, and at the same positions,
-      --  except for the node at the specified position.
-
    end Formal_Model;
 
    use Formal_Model;
@@ -407,7 +429,15 @@ is
    with
      Global => null,
      Post   => Is_Root'Result = M_Is_Root (Container, Position);
-   --  Query if a cursor references the root of the tree
+   --  Query if a cursor references the root of the tree.
+
+   function Is_Leaf
+     (Container : Tree;
+      Position  : Cursor)
+      return Boolean
+   with
+     Global => null,
+     Post   => Is_Leaf'Result = M_Is_Leaf (Container, Position);
 
    function Root (Container : Tree) return Cursor with
      Global => null,
@@ -419,19 +449,25 @@ is
    --  No_Element is returned iff the tree is empty, otherwise a cursor to the
    --  root node is returned.
 
-   function First (Container : Tree) return Cursor is
-     (Root (Container))
-   with
+   function First (Container : Tree) return Cursor renames Root;
+   --  Get a cursor to the first element in the tree.
+
+   function First_Element (Container : Tree) return Element_Type with
      Global => null,
-     Contract_Cases =>
-       (Is_Empty (Container) => First'Result = No_Element,
-        others               => Has_Element (Container, First'Result));
+     Pre    => not Is_Empty (Container);
+   --  Get the first element in the tree.
 
    function Last (Container : Tree) return Cursor with
      Global => null,
      Contract_Cases =>
        (Is_Empty (Container) => Last'Result = No_Element,
         others               => Has_Element (Container, Last'Result));
+
+   function Last_Element (Container : Tree) return Element_Type is
+     (Element (Container, Last (Container)))
+   with
+     Global => null,
+     Pre    => not Is_Empty (Container);
 
    function Next
      (Container : Tree;
@@ -463,9 +499,165 @@ is
                and then (if Prev'Result /= No_Element then
                            Has_Element (Container, Position));
 
-   function Root_Element (Container : Tree) return Element_Type is
-     (Element (Container, Root (Container)))
+   function First_Child
+     (Container : Tree;
+      Position  : Cursor)
+      return Cursor
    with
+     Global => null,
+     Post   =>
+       --  No_Element is returned if an invalid cursor is given or the
+       --  node at that Position is not a leaf node. Otherwise, a valid
+       --  cursor is returned.
+       (First_Child'Result = No_Element)
+       =
+       (not Has_Element (Container, Position)
+        or else M_Is_Leaf (Container, Position))
+
+       and then
+         (if First_Child'Result /= No_Element then
+            --  A valid cursor is returned
+            Has_Element (Container, First_Child'Result)
+
+            --  The referenced node is a child of the node at Position.
+            and then M_Parent (Container, First_Child'Result) = Position
+
+            --  The returned child is the first child
+            and then (for all W in Way_Type =>
+                        (if W < Direction (Container, First_Child'Result) then
+                           M_Child (Container, Position, W) = No_Element)));
+
+   function First_Child_Element
+     (Container : Tree;
+      Position  : Cursor)
+      return Element_Type
+   with
+     Pre => Has_Element (Container, Position)
+            and then M_Has_Children (Container, Position),
+     Post => First_Child_Element'Result =
+               Element (Container, First_Child (Container, Position));
+
+   function Last_Child
+     (Container : Tree;
+      Position  : Cursor)
+      return Cursor
+   with
+     Global => null,
+     Post   =>
+       --  No_Element is returned if an invalid cursor is given or the
+       --  node at that Position is not a leaf node. Otherwise, a valid
+       --  cursor is returned.
+       (Last_Child'Result = No_Element)
+       =
+       (not Has_Element (Container, Position)
+        or else M_Is_Leaf (Container, Position))
+
+       and then
+         (if Last_Child'Result /= No_Element then
+            --  A valid cursor is returned
+            Has_Element (Container, Last_Child'Result)
+
+            --  The referenced node is a child of the node at Position.
+            and then M_Parent (Container, Last_Child'Result) = Position
+
+            --  The returned child is the last child
+            and then (for all W in Way_Type =>
+                        (if W > Direction (Container, Last_Child'Result) then
+                           M_Child (Container, Position, W) = No_Element)));
+
+   function Last_Child_Element
+     (Container : Tree;
+      Position  : Cursor)
+      return Element_Type
+   with
+     Pre => Has_Element (Container, Position)
+            and then M_Has_Children (Container, Position),
+     Post => Last_Child_Element'Result =
+               Element (Container, Last_Child (Container, Position));
+
+   function Next_Sibling
+     (Container : Tree;
+      Position  : Cursor)
+      return Cursor
+   with
+     Global => null,
+     Post   =>
+       --  A non-null cursor is returned iff Position references a valid
+       --  non-root node, and there exists a sibling node with a higher way
+       --  than the node at Position. Otherwise, No_Element is returned.
+       (Next_Sibling'Result /= No_Element)
+       =
+       (Has_Element (Container, Position)
+        and then not Is_Root (Container, Position)
+        and then (for some W in Way_Type =>
+                    W > Direction (Container, Position)
+                    and then M_Has_Sibling (Container, Position, W)))
+
+       --  If a non-null cursor is returned, then that cursor references the
+       --  next sibling node.
+       and then
+         (if Next_Sibling'Result /= No_Element then
+            Has_Element (Container, Next_Sibling'Result)
+
+            --  The result has the same parent as the node at Position
+            and then M_Parent (Container, Next_Sibling'Result) =
+                     M_Parent (Container, Position)
+
+            --  A next sibling is returned
+            and then Direction (Container, Next_Sibling'Result) >
+                     Direction (Container, Position)
+
+            --  The returned sibling is the closest next one.
+            --  That is, there are no other siblings between the returned
+            --  one and the one at Position.
+            and then
+              (for all W in Way_Type =>
+                 (if W < Direction (Container, Next_Sibling'Result)
+                    and then W > Direction (Container, Position)
+                  then not M_Has_Sibling (Container, Position, W))));
+
+   function Prev_Sibling
+     (Container : Tree;
+      Position  : Cursor)
+      return Cursor
+   with
+     Global => null,
+     Post   =>
+       --  A non-null cursor is returned iff Position references a valid
+       --  non-root node, and there exists a sibling node with a lower way
+       --  than the node at Position. Otherwise, No_Element is returned.
+       (Prev_Sibling'Result /= No_Element)
+       =
+       (Has_Element (Container, Position)
+        and then not Is_Root (Container, Position)
+        and then (for some W in Way_Type =>
+                    W < Direction (Container, Position)
+                    and then M_Has_Sibling (Container, Position, W)))
+
+       --  If a non-null cursor is returned, then that cursor references the
+       --  previous sibling node.
+       and then
+         (if Prev_Sibling'Result /= No_Element then
+            Has_Element (Container, Prev_Sibling'Result)
+
+            --  The result has the same parent as the node at Position
+            and then M_Parent (Container, Prev_Sibling'Result) =
+                     M_Parent (Container, Position)
+
+            --  A previous sibling is returned
+            and then Direction (Container, Prev_Sibling'Result) <
+                     Direction (Container, Position)
+
+            --  The returned sibling is the closest previous one.
+            --  That is, there are no other siblings between the returned
+            --  one and the one at Position.
+            and then
+              (for all W in Way_Type =>
+                 (if W > Direction (Container, Prev_Sibling'Result)
+                    and then W < Direction (Container, Position)
+                  then not M_Has_Sibling (Container, Position, W))));
+
+   function Root_Element (Container : Tree) return Element_Type with
      Global => null,
      Pre    => not Is_Empty (Container);
    --  Get the element at the root of the tree.
@@ -499,8 +691,8 @@ is
                 else Child'Result = M_Child (Container, Position, Way));
    --  Get a cursor to a child element of a node.
    --
-   --  No_Element is returned if the specified Position does not have a child
-   --  at the specified Way.
+   --  No_Element is returned if the node at the given Position does not have a
+   --  child at the specified Way.
 
    function Direction
      (Container : Tree;
@@ -511,6 +703,8 @@ is
      Global => null,
      Pre    => Has_Element (Container, Position),
      Post   => Direction'Result = Model (Container) (Position.Node).Way;
+   --  Get the direction (way) to the node at the given Position from its
+   --  parent node.
 
    function Is_Ancestor
      (Container : Tree;
@@ -615,9 +809,9 @@ is
 
        --  A new node has been inserted at the requested position in the tree
        and then Has_Element (Container, M_Parent (Container, Position))
-       and then
-         Equivalent_Elements
-           (New_Item, Element (Container, M_Parent (Container, Position)))
+       and then Equivalent_Elements
+                  (New_Item,
+                   Element (Container, M_Parent (Container, Position)))
        and then
          Model (Container) (M_Parent (Container, Position).Node) =
            (Path     => Way_Sequences.Add
@@ -675,6 +869,7 @@ is
       Position  : Cursor)
       return not null access constant Element_Type
    with
+     Inline,
      Global => null,
      Pre    => Has_Element (Container, Position),
      Post   => Equivalent_Elements
@@ -686,6 +881,7 @@ is
       Position  : Cursor)
       return not null access Element_Type
    with
+     Inline,
      Global => null,
      Pre    => Has_Element (Container.all, Position),
      Post   => --  Cursors are preserved
@@ -698,11 +894,12 @@ is
 
                --  Other elements are preserved
                and then
-                 M_Elements_Unchanged_Except
-                   (Container.all'Old, At_End (Container).all, Position)
-               and then
-                 M_Elements_Unchanged_Except
-                   (At_End (Container).all, Container.all'Old, Position)
+                 (for all I in Positive_Count_Type =>
+                    (if Model (Container.all'Old) (I).In_Tree
+                        and then I /= Position.Node
+                     then Equivalent_Elements
+                            (Element (Container.all'Old, To_Cursor (I)),
+                             Element (Container.all, To_Cursor (I)))))
 
                --  The value designated by the result of Reference is now
                --  equivalent to the element at the specified Position in the

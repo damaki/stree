@@ -7,13 +7,6 @@ package body Stree.Unbounded_Multiway_Trees with
   SPARK_Mode => Off
 is
 
-   function Empty_Tree return Tree is
-     ((Nodes => Node_Vectors.Empty_Vector,
-       Root  => No_Element));
-
-   function Length (Container : Tree) return Count_Type is
-     (Node_Vectors.Length (Container.Nodes));
-
    package body Formal_Model is
 
       function All_Cursors (Container : Tree) return Cursor_Sets.Set is
@@ -78,8 +71,35 @@ is
 
    end Formal_Model;
 
+   ----------------
+   -- Empty_Tree --
+   ----------------
+
+   function Empty_Tree return Tree is
+     ((Nodes => Node_Vectors.Empty_Vector,
+       Root  => No_Element));
+
+   ------------
+   -- Length --
+   ------------
+
+   ------------
+   -- Length --
+   ------------
+
+   function Length (Container : Tree) return Count_Type is
+     (Node_Vectors.Length (Container.Nodes));
+
+   ----------------
+     -- Is_Empty --
+   ----------------
+
    function Is_Empty (Container : Tree) return Boolean is
      (Container.Root = No_Element);
+
+   -------------------
+     -- Has_Element --
+   -------------------
 
    function Has_Element
      (Container : Tree;
@@ -88,12 +108,20 @@ is
    is
      (Node_Vectors.Has_Element (Container.Nodes, Position.Node));
 
+   ---------------
+     -- Element --
+   ---------------
+
    function Element
      (Container : Tree;
       Position  : Cursor)
       return Element_Type
    is
      (Node_Vectors.Element (Container.Nodes, Position.Node).Element);
+
+   ---------------
+     -- Is_Root --
+   ---------------
 
    function Is_Root
      (Container : Tree;
@@ -103,7 +131,52 @@ is
      (not Is_Empty (Container)
       and then Position = Container.Root);
 
+   ----------------
+      -- Is_Leaf --
+   ----------------
+
+   function Is_Leaf
+     (Container : Tree;
+      Position  : Cursor)
+      return Boolean
+   is
+   begin
+      if not Has_Element (Container, Position) then
+         return False;
+      end if;
+
+      declare
+         Node_Acc : constant not null access constant Node_Type :=
+                      Node_Vectors.Constant_Reference
+                        (Container.Nodes, Position.Node);
+      begin
+         return (for all C of Node_Acc.all.Ways => C = No_Element);
+      end;
+   end Is_Leaf;
+
+   ----------
+   -- Root --
+   ----------
+
    function Root (Container : Tree) return Cursor is (Container.Root);
+
+   -------------------
+   -- First_Element --
+   -------------------
+
+   function First_Element (Container : Tree) return Element_Type is
+      Node : constant Cursor := First (Container);
+   begin
+      if Node = No_Element then
+         raise Constraint_Error with "Tree is empty";
+      end if;
+
+      return Element (Container, Node);
+   end First_Element;
+
+   ---------------------
+   -- Last_In_Subtree --
+   ---------------------
 
    function Last_In_Subtree
      (Container    : Tree;
@@ -136,10 +209,18 @@ is
       return Node;
    end Last_In_Subtree;
 
+   ----------
+   -- Last --
+   ----------
+
    function Last (Container : Tree) return Cursor is
    begin
       return Last_In_Subtree (Container, Root (Container));
    end Last;
+
+   ----------
+   -- Next --
+   ----------
 
    function Next
      (Container : Tree;
@@ -223,13 +304,16 @@ is
       end;
    end Next;
 
+   ----------
+   -- Prev --
+   ----------
+
    function Prev
      (Container : Tree;
       Position  : Cursor)
       return Cursor
    is
       Node : Cursor;
-      Dir  : Way_Type;
 
    begin
       if not Has_Element (Container, Position) then
@@ -254,7 +338,7 @@ is
                            Node_Vectors.Constant_Reference
                              (Container.Nodes, Pos_Acc.all.Parent.Node);
          begin
-            if Pos_Acc.all.Position /= Way_Type'FIrst then
+            if Pos_Acc.all.Position /= Way_Type'First then
                for W in reverse Way_Type'First ..
                                 Way_Type'Pred (Pos_Acc.all.Position)
                loop
@@ -272,6 +356,202 @@ is
          return Parent (Container, Position);
       end;
    end Prev;
+
+   -----------------
+   -- First_Child --
+   -----------------
+
+   function First_Child
+     (Container : Tree;
+      Position  : Cursor)
+      return Cursor
+   is
+   begin
+      if not Has_Element (Container, Position) then
+         return No_Element;
+      end if;
+
+      declare
+         Node_Acc : constant not null access constant Node_Type :=
+                      Node_Vectors.Constant_Reference
+                        (Container.Nodes, Position.Node);
+      begin
+         for C of Node_Acc.all.Ways loop
+            if C /= No_Element then
+               return C;
+            end if;
+         end loop;
+      end;
+
+      return No_Element;
+   end First_Child;
+
+   -------------------------
+   -- First_Child_Element --
+   -------------------------
+
+   function First_Child_Element
+     (Container : Tree;
+      Position  : Cursor)
+      return Element_Type
+   is
+      Node : constant Cursor := First_Child (Container, Position);
+   begin
+      if Node = No_Element then
+         raise Constraint_Error with "Node has no children";
+      end if;
+
+      return Element (Container, Node);
+   end First_Child_Element;
+
+   ----------------
+   -- Last_Child --
+   ----------------
+
+   function Last_Child
+     (Container : Tree;
+      Position  : Cursor)
+      return Cursor
+   is
+   begin
+      if not Has_Element (Container, Position) then
+         return No_Element;
+      end if;
+
+      declare
+         Node_Acc : constant not null access constant Node_Type :=
+                      Node_Vectors.Constant_Reference
+                        (Container.Nodes, Position.Node);
+      begin
+         for C of reverse Node_Acc.all.Ways loop
+            if C /= No_Element then
+               return C;
+            end if;
+         end loop;
+      end;
+
+      return No_Element;
+   end Last_Child;
+
+   ------------------------
+   -- Last_Child_Element --
+   ------------------------
+
+   function Last_Child_Element
+     (Container : Tree;
+      Position  : Cursor)
+      return Element_Type
+   is
+      Node : constant Cursor := Last_Child (Container, Position);
+   begin
+      if Node = No_Element then
+         raise Constraint_Error with "Node has no children";
+      end if;
+
+      return Element (Container, Node);
+   end Last_Child_Element;
+
+   ------------------
+   -- Next_Sibling --
+   ------------------
+
+   function Next_Sibling
+     (Container : Tree;
+      Position  : Cursor)
+      return Cursor
+   is
+   begin
+      if not Has_Element (Container, Position) then
+         return No_Element;
+      end if;
+
+      declare
+         Node_Acc : constant not null access constant Node_Type :=
+                      Node_Vectors.Constant_Reference
+                        (Container.Nodes, Position.Node);
+      begin
+         if Node_Acc.all.Parent = No_Element
+            or else Node_Acc.all.Position = Way_Type'Last
+         then
+            return No_Element;
+         end if;
+
+         declare
+            Parent_Acc : constant not null access constant Node_Type :=
+                           Node_Vectors.Constant_Reference
+                             (Container.Nodes, Node_Acc.all.Parent.Node);
+         begin
+            for W in Way_Type'Succ (Node_Acc.all.Position) .. Way_Type'Last
+            loop
+               if Parent_Acc.all.Ways (W) /= No_Element then
+                  return Parent_Acc.all.Ways (W);
+               end if;
+            end loop;
+         end;
+      end;
+
+      return No_Element;
+   end Next_Sibling;
+
+   ------------------
+   -- Prev_Sibling --
+   ------------------
+
+   function Prev_Sibling
+     (Container : Tree;
+      Position  : Cursor)
+      return Cursor
+   is
+   begin
+      if not Has_Element (Container, Position) then
+         return No_Element;
+      end if;
+
+      declare
+         Node_Acc : constant not null access constant Node_Type :=
+                      Node_Vectors.Constant_Reference
+                        (Container.Nodes, Position.Node);
+      begin
+         if Node_Acc.all.Parent = No_Element
+            or else Node_Acc.all.Position = Way_Type'First
+         then
+            return No_Element;
+         end if;
+
+         declare
+            Parent_Acc : constant not null access constant Node_Type :=
+                           Node_Vectors.Constant_Reference
+                             (Container.Nodes, Node_Acc.all.Parent.Node);
+         begin
+            for W in reverse Way_Type'First ..
+                             Way_Type'Pred (Node_Acc.all.Position)
+            loop
+               if Parent_Acc.all.Ways (W) /= No_Element then
+                  return Parent_Acc.all.Ways (W);
+               end if;
+            end loop;
+         end;
+      end;
+
+      return No_Element;
+   end Prev_Sibling;
+
+   ------------------
+   -- Root_Element --
+   ------------------
+
+   function Root_Element (Container : Tree) return Element_Type is
+   begin
+      if Is_Empty (Container) then
+         raise Constraint_Error with "Invalid root";
+      end if;
+
+      return Element (Container, Root (Container));
+   end Root_Element;
+
+   ------------
+   -- Parent --
+   ------------
 
    function Parent
      (Container : Tree;
@@ -291,6 +571,10 @@ is
          end;
       end if;
    end Parent;
+
+   -----------
+   -- Child --
+   -----------
 
    function Child
      (Container : Tree;
@@ -312,6 +596,10 @@ is
       end if;
    end Child;
 
+   ---------------
+   -- Direction --
+   ---------------
+
    function Direction
      (Container : Tree;
       Position  : Cursor)
@@ -323,6 +611,10 @@ is
    begin
       return Node_Acc.all.Position;
    end Direction;
+
+   -----------------
+   -- Is_Ancestor --
+   -----------------
 
    function Is_Ancestor
      (Container : Tree;
@@ -338,6 +630,10 @@ is
 
       return Node /= No_Element;
    end Is_Ancestor;
+
+   -----------
+   -- Depth --
+   -----------
 
    function Depth
      (Container : Tree;
@@ -359,6 +655,10 @@ is
       return Count;
    end Depth;
 
+   -----------------
+   -- Insert_Root --
+   -----------------
+
    procedure Insert_Root
      (Container : in out Tree;
       New_Item  :        Element_Type)
@@ -372,6 +672,10 @@ is
       Container.Root :=
         Cursor'(Node => Node_Vectors.First_Index (Container.Nodes));
    end Insert_Root;
+
+   ------------------
+   -- Insert_Child --
+   ------------------
 
    procedure Insert_Child
      (Container : in out Tree;
@@ -396,6 +700,10 @@ is
            Cursor'(Node => Node_Vectors.Last_Index (Container.Nodes));
       end;
    end Insert_Child;
+
+   -------------------
+   -- Insert_Parent --
+   -------------------
 
    procedure Insert_Parent
      (Container : in out Tree;
@@ -457,6 +765,10 @@ is
       end if;
    end Insert_Parent;
 
+   ------------------------
+   -- Constant_Reference --
+   ------------------------
+
    function Constant_Reference
      (Container : aliased Tree;
       Position  : Cursor)
@@ -464,8 +776,13 @@ is
    is
    begin
       return Node_Vectors.Constant_Reference
-               (Container.Nodes, Position.Node).all.Element'Access;
+               (Container.Nodes, Position.Node)
+               .all.Element'Access;
    end Constant_Reference;
+
+   ---------------
+   -- Reference --
+   ---------------
 
    function Reference
      (Container : not null access Tree;
@@ -474,7 +791,8 @@ is
    is
    begin
       return Node_Vectors.Reference
-               (Container.all.Nodes'Access, Position.Node).all.Element'Access;
+               (Container.all.Nodes'Access, Position.Node)
+               .all.Element'Access;
    end Reference;
 
 end Stree.Unbounded_Multiway_Trees;

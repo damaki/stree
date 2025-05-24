@@ -1,12 +1,12 @@
-with "config/spark_multiway_trees_config.gpr";
+with "config/stree_config.gpr";
 with "sparklib.gpr";
-project Spark_Multiway_Trees is
+project Stree is
 
-   for Library_Name use "Spark_Multiway_Trees";
-   for Library_Version use Project'Library_Name & ".so." & Spark_Multiway_Trees_Config.Crate_Version;
+   for Library_Name use "Stree";
+   for Library_Version use Project'Library_Name & ".so." & Stree_Config.Crate_Version;
 
    for Source_Dirs use ("src/", "config/");
-   for Object_Dir use "obj/" & Spark_Multiway_Trees_Config.Build_Profile;
+   for Object_Dir use "obj/" & Stree_Config.Build_Profile;
    for Create_Missing_Dirs use "True";
    for Library_Dir use "lib";
 
@@ -16,7 +16,7 @@ project Spark_Multiway_Trees is
    for Library_Kind use Library_Type;
 
    package Compiler is
-      for Default_Switches ("Ada") use Spark_Multiway_Trees_Config.Ada_Compiler_Switches;
+      for Default_Switches ("Ada") use Stree_Config.Ada_Compiler_Switches;
    end Compiler;
 
    package Binder is
@@ -27,4 +27,4 @@ project Spark_Multiway_Trees is
       for Artifacts (".") use ("share");
    end Install;
 
-end Spark_Multiway_Trees;
+end Stree;
