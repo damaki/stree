@@ -15,6 +15,8 @@ package Tree_Tests.Element_Tests is
 
    procedure Test_Element_1 (T : in out Test_Fixture);
    procedure Test_Element_5 (T : in out Test_Fixture);
+   procedure Test_Element_Invalid_Cursor (T : in out Test_Fixture);
+   procedure Test_Element_No_Element (T : in out Test_Fixture);
 
    procedure Add_To_Suite (S : in out Test_Suite'Class);
 

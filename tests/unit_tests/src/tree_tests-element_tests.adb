@@ -67,6 +67,51 @@ package body Tree_Tests.Element_Tests is
               "Invalid element value returned for node ML");
    end Test_Element_5;
 
+   ---------------------------------
+   -- Test_Element_Invalid_Cursor --
+   ---------------------------------
+
+   --  Test that calling Element and violating its precondition
+   --  (with a cursor that is not No_Element, but is still invalid) raises
+   --  a Constraint_Error.
+
+   procedure Test_Element_Invalid_Cursor (T : in out Test_Fixture) is
+      Container : Tree;
+      Unused    : Integer;
+   begin
+      Insert_Root (Container, 1);
+
+      declare
+      begin
+         Unused := Element (Container, Cursor'(Node => 123));
+      exception
+         when Constraint_Error =>
+            null;
+      end;
+   end Test_Element_Invalid_Cursor;
+
+   -----------------------------
+   -- Test_Element_No_Element --
+   -----------------------------
+
+   --  Test that calling Element and violating its precondition
+   --  (with a No_Element cursor) raises a Constraint_Error.
+
+   procedure Test_Element_No_Element (T : in out Test_Fixture) is
+      Container : Tree;
+      Unused    : Integer;
+   begin
+      Insert_Root (Container, 1);
+
+      declare
+      begin
+         Unused := Element (Container, No_Element);
+      exception
+         when Constraint_Error =>
+            null;
+      end;
+   end Test_Element_No_Element;
+
    ------------------
    -- Add_To_Suite --
    ------------------
@@ -77,6 +122,10 @@ package body Tree_Tests.Element_Tests is
                                  Test_Element_1'Access));
       S.Add_Test (Caller.Create ("Element (5 node tree)",
                                  Test_Element_5'Access));
+      S.Add_Test (Caller.Create ("Element (Invalid cursor)",
+                                 Test_Element_Invalid_Cursor'Access));
+      S.Add_Test (Caller.Create ("Element (No_Element cursor)",
+                                 Test_Element_No_Element'Access));
    end Add_To_Suite;
 
 end Tree_Tests.Element_Tests;
