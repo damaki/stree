@@ -55,25 +55,6 @@ is
      Post   => Is_Empty (Container) = (Length'Result = 0);
    --  Get the number of elements in the tree
 
-   function Has_Element
-     (Container : Tree;
-      Position  : Cursor)
-      return Boolean
-   with
-     Global => null,
-     Post   => (if Position = No_Element or else Is_Empty (Container) then
-                  not Has_Element'Result);
-   --  Query if the tree has an element at the specified cursor
-
-   function Element
-     (Container : Tree;
-      Position  : Cursor)
-      return Element_Type
-   with
-     Global => null,
-     Pre => Has_Element (Container, Position);
-   --  Get the element at the specified position in the tree
-
    pragma Unevaluated_Use_Of_Old (Allow);
 
    ------------------
@@ -86,29 +67,9 @@ is
 
       package Count_Type_Conversions is new
         SPARK.Big_Integers.Signed_Conversions (Count_Type);
-      use Count_Type_Conversions;
 
       function To_Cursor (I : Positive_Count_Type) return Cursor is
         (Cursor'(Node => I));
-
-      -------------
-      -- Cursors --
-      -------------
-
-      package Cursor_Sets is new SPARK.Containers.Functional.Sets
-        (Element_Type => Cursor);
-      use Cursor_Sets;
-
-      function All_Cursors (Container : Tree) return Cursor_Sets.Set with
-        Global => null,
-        Post   => --  The set contains only cursors that are in the container
-                  (for all I in Count_Type =>
-                     Has_Element (Container, Cursor'(Node => I)) =
-                       Contains (All_Cursors'Result, Cursor'(Node => I)))
-
-                  and then Length (All_Cursors'Result) =
-                             To_Big_Integer (Length (Container));
-      --  Get the set of all valid cursors in the tree
 
       -----------
       -- Paths --
@@ -215,15 +176,9 @@ is
       function Model (Container : Tree) return Model_Type with
         Global => null,
         Post   =>
-          --  In_Tree reflects whether the tree has an element at the cursor
-          (for all I in Model'Result'Range =>
-             Model'Result (I).In_Tree =
-               Has_Element (Container, To_Cursor (I)))
-
           --  If the tree is empty then there are no nodes in the tree,
           --  otherwise there is at least one node.
-          and then
-            Is_Empty (Container) = (for all N of Model'Result => not N.In_Tree)
+          Is_Empty (Container) = (for all N of Model'Result => not N.In_Tree)
 
           --  All nodes not in the tree have no parent or children, and have
           --  an empty path
@@ -316,8 +271,8 @@ is
       with
         Global => null,
         Post   => (if M_Is_Root'Result then
-                     Model (Container) (Position.Node).Parent = No_Element
-                     and then Has_Element (Container, Position));
+                     Parent (Model (Container), Position) = No_Element
+                     and then Has_Element (Model (Container), Position));
 
       function M_Parent
         (Container : Tree;
@@ -327,10 +282,10 @@ is
         (Model (Container) (Position.Node).Parent)
       with
         Global => null,
-        Pre  => Has_Element (Container, Position),
+        Pre  => Has_Element (Model (Container), Position),
         Post => (if M_Is_Root (Container, Position)
                  then M_Parent'Result = No_Element
-                 else Has_Element (Container, M_Parent'Result));
+                 else Has_Element (Model (Container), M_Parent'Result));
 
       function M_Child
         (Container : Tree;
@@ -341,9 +296,9 @@ is
         (Model (Container) (Position.Node).Children (Way))
       with
         Global => null,
-        Pre  => Has_Element (Container, Position),
+        Pre  => Has_Element (Model (Container), Position),
         Post => (if M_Child'Result /= No_Element then
-                   Has_Element (Container, M_Child'Result));
+                   Has_Element (Model (Container), M_Child'Result));
 
       function M_Has_Child
         (Container : Tree;
@@ -354,7 +309,7 @@ is
         (M_Child (Container, Position, Way) /= No_Element)
       with
         Global => null,
-        Pre  => Has_Element (Container, Position);
+        Pre  => Has_Element (Model (Container), Position);
 
       function M_Has_Sibling
         (Container : Tree;
@@ -362,7 +317,7 @@ is
          Way       : Way_Type)
          return Boolean
       is
-        (Has_Element (Container, Position)
+        (Has_Element (Model (Container), Position)
          and then not M_Is_Root (Container, Position)
          and then M_Has_Child (Container, M_Parent (Container, Position), Way))
       with
@@ -378,16 +333,15 @@ is
            Model (Container) (Child.Node).Path)
       with
         Global => null,
-        Pre    => Has_Element (Container, Ancestor)
-                  and then Has_Element (Container, Child);
+        Pre    => Has_Element (Model (Container), Ancestor)
+                  and then Has_Element (Model (Container), Child);
 
       function M_Depth
         (Container : Tree;
          Position  : Cursor)
          return Count_Type
       is
-        (Count_Type
-           (To_Integer (Length (Model (Container) (Position.Node).Path))))
+        (Count_Type (To_Integer (Length (Path (Model (Container), Position)))))
       with
         Global => null,
         Pre    => Position /= No_Element;
@@ -430,17 +384,6 @@ is
       --  Left and Right have the same tree structure, except for the node at
       --  the specified Position.
 
-      function M_Elements_Unchanged
-        (Left, Right : Tree)
-         return Boolean
-      is
-        (for all I in Positive_Count_Type =>
-           (if Model (Left) (I).In_Tree then
-              Model (Right) (I).In_Tree
-              and then Equivalent_Elements (Element (Left,  To_Cursor (I)),
-                                            Element (Right, To_Cursor (I)))));
-      --  Elements in Left are unchanged in Right, and at the same positions
-
       function M_In_Branch
         (Container : Tree;
          Ancestor  : Cursor;
@@ -455,6 +398,22 @@ is
       --  True if node Child is in the subtree of the specified branch of
       --  an Ancestor node.
 
+      -------------
+      -- Cursors --
+      -------------
+
+      package Cursor_Sets is new SPARK.Containers.Functional.Sets
+        (Element_Type => Cursor);
+      use Cursor_Sets;
+
+      function All_Cursors (Container : Tree) return Cursor_Sets.Set with
+        Global => null,
+        Post   => --  The set contains only cursors that are in the container
+                  (for all I in Count_Type =>
+                     Has_Element (Model (Container), Cursor'(Node => I)) =
+                       Contains (All_Cursors'Result, Cursor'(Node => I)));
+      --  Get the set of all valid cursors in the tree
+
    end Formal_Model;
 
    use Formal_Model;
@@ -462,6 +421,24 @@ is
    use Formal_Model.Count_Type_Conversions;
 
    use type Formal_Model.Way_Sequences.Sequence;
+
+   function Has_Element
+     (Container : Tree;
+      Position  : Cursor)
+      return Boolean
+   with
+     Global => null,
+     Post   => Has_Element'Result = Has_Element (Model (Container), Position);
+   --  Query if the tree has an element at the specified cursor
+
+   function Element
+     (Container : Tree;
+      Position  : Cursor)
+      return Element_Type
+   with
+     Global => null,
+     Pre => Has_Element (Container, Position);
+   --  Get the element at the specified position in the tree
 
    function Is_Root
      (Container : Tree;
@@ -700,7 +677,8 @@ is
 
    function Root_Element (Container : Tree) return Element_Type with
      Global => null,
-     Pre    => not Is_Empty (Container);
+     Pre    => not Is_Empty (Container),
+     Post   => Root_Element'Result = Element (Container, Root (Container));
    --  Get the element at the root of the tree.
    --
    --  This may only be called when the tree is not empty.
@@ -799,6 +777,10 @@ is
        --  The length of the container has incremented
        Length (Container) = Length (Container'Old) + 1
 
+       --  An element has been inserted as a child of the specified node
+       and then
+         Has_Element (Model (Container), M_Child (Container, Position, Way))
+
        --  A new node has been inserted as a child of the specified Position
        and then
          Model (Container) (M_Child (Container, Position, Way).Node) =
@@ -815,7 +797,13 @@ is
                    Element (Container, M_Child (Container, Position, Way)))
 
        --  All previously existing elements are unchanged
-       and then M_Elements_Unchanged (Container'Old, Container)
+       and then
+         (for all I in Model_Type'Range =>
+            (if Model (Container'Old) (I).In_Tree then
+               Model (Container) (I).In_Tree
+               and then Equivalent_Elements
+                          (Element (Container'Old, To_Cursor (I)),
+                           Element (Container,     To_Cursor (I)))))
 
        --  The tree structure is unchanged, except for the node at the
        --  specified position.
