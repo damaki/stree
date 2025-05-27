@@ -192,6 +192,26 @@ is
                         Way_Sequences.Length (N.Path)
                         < To_Big_Integer (Integer (Positive_Count_Type'Last)));
 
+      function Parent (M : Model_Type; C : Cursor) return Cursor is
+        (M (C.Node).Parent)
+      with
+        Pre => C /= No_Element;
+
+      function Path (M : Model_Type; C : Cursor) return Way_Sequences.Sequence
+      is
+        (M (C.Node).Path)
+      with
+        Pre => C /= No_Element;
+
+      function Child (M : Model_Type; C : Cursor; W : Way_Type) return Cursor
+      is
+        (M (C.Node).Children (W))
+      with
+        Pre => C /= No_Element;
+
+      function Has_Element (M : Model_Type; C : Cursor) return Boolean is
+        (C /= No_Element and then M (C.Node).In_Tree);
+
       function Model (Container : Tree) return Model_Type with
         Global => null,
         Post   =>
@@ -217,10 +237,8 @@ is
           --  For the root node (i.e. the node with no parent), the path to
           --  itself is empty. For all other nodes the path is non-empty.
           and then
-            (for all I in Model'Result'Range =>
-               (Model'Result (I).Parent = No_Element)
-               =
-               (Length (Model'Result (I).Path) = 0))
+            (for all N of Model'Result =>
+               (N.Parent = No_Element) = (Length (N.Path) = 0))
 
           --  If the tree is not empty, then there is a root
           and then
@@ -247,8 +265,8 @@ is
                (if Model'Result (I).In_Tree then
                   (for all W in Way_Type =>
                      (if Model'Result (I).Children (W) /= No_Element then
-                        Model'Result (Model'Result
-                                        (I).Children (W).Node).In_Tree
+                        Has_Element (Model'Result,
+                                     Model'Result (I).Children (W))
                         and then Model'Result
                                    (Model'Result (I).Children (W).Node)
                                    .Parent.Node = I))))
@@ -270,9 +288,18 @@ is
                (if Model'Result (I).In_Tree then
                   (for all J in Model'Result'Range =>
                      (if Model'Result (J).In_Tree
-                         and then Model'Result (J).Path =
-                                  Model'Result (I).Path
-                      then J = I))));
+                         and then Model'Result (J).Path = Model'Result (I).Path
+                      then J = I))))
+
+           --  Nodes not in the tree have no children, no parent, and an empty
+           --  path.
+           and then
+             (for all N of Model'Result =>
+                (if not N.In_Tree then
+                   N.Parent = No_Element
+                   and then N.Path = Empty_Sequence
+                   and then N.Way = Way_Type'First
+                   and then (for all C of N.Children => C = No_Element)));
 
       ---------------------
       -- Model Functions --
@@ -413,6 +440,20 @@ is
               and then Equivalent_Elements (Element (Left,  To_Cursor (I)),
                                             Element (Right, To_Cursor (I)))));
       --  Elements in Left are unchanged in Right, and at the same positions
+
+      function M_In_Branch
+        (Container : Tree;
+         Ancestor  : Cursor;
+         Way       : Way_Type;
+         Child     : Cursor)
+         return Boolean
+      is
+        (Has_Element (Model (Container), Ancestor)
+         and then Has_Element (Model (Container), Child)
+         and then Add (Path (Model (Container), Ancestor), Way) <=
+                  Path (Model (Container), Child));
+      --  True if node Child is in the subtree of the specified branch of
+      --  an Ancestor node.
 
    end Formal_Model;
 
