@@ -21,19 +21,22 @@ is
       pragma Assert (Length (T) = 2);
       pragma Assert (Root_Element (T) = 1);
       pragma Assert (Element (T, Child (T, Root (T), Left)) = 2);
+      pragma Assert (Child (T, Root (T), Middle) = No_Element);
+      pragma Assert (Child (T, Root (T), Right) = No_Element);
 
       Insert_Child (T, 3, Root (T), Middle);
       pragma Assert (Length (T) = 3);
       pragma Assert (Root_Element (T) = 1);
       pragma Assert (Element (T, Child (T, Root (T), Left)) = 2);
       pragma Assert (Element (T, Child (T, Root (T), Middle)) = 3);
+      pragma Assert (Child (T, Root (T), Right) = No_Element);
 
       Insert_Child (T, 4, Root (T), Right);
       pragma Assert (Length (T) = 4);
       pragma Assert (Root_Element (T) = 1);
       pragma Assert (Element (T, Child (T, Root (T), Left)) = 2);
       pragma Assert (Element (T, Child (T, Root (T), Middle)) = 3);
-      pragma Assert (Element (T, Child (T, Root (T), Middle)) = 4);
+      pragma Assert (Element (T, Child (T, Root (T), Right)) = 4);
    end Create;
 
 end P;
