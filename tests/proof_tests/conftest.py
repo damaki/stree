@@ -21,16 +21,16 @@ def pytest_addoption(parser):
         help="The directory containing support files for the tests",
     )
     parser.addoption(
-        "--baseline",
-        default=False,
-        action="store_true",
-        help="Update test baselines",
-    )
-    parser.addoption(
         "--gnatprove-jobs",
         default=1,
         type=int,
         help="Set -j flag passed to GNATprove"
+    )
+    parser.addoption(
+        "--no-clean",
+        default=False,
+        action="store_true",
+        help="Don't delete any existing test case build directories"
     )
 
 def get_tests_dir(request) -> Path:
@@ -42,8 +42,8 @@ def get_build_dir(request) -> Path:
 def get_support_dir(request) -> Path:
     return Path(request.config.getoption("--support-dir"))
 
-def get_baseline(request) -> bool:
-    return request.config.getoption("--baseline")
-
 def get_gnatprove_jobs(request) -> int:
     return request.config.getoption("--gnatprove-jobs")
+
+def get_no_clean(request) -> bool:
+    return request.config.getoption("--no-clean")

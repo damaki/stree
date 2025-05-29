@@ -44,12 +44,13 @@ class TestCase:
         build directory.
         """
 
-        # Remove any previous build artifacts
-        if self._build_dir.exists():
-            shutil.rmtree(self._build_dir)
+        if not conftest.get_no_clean(self._request):
+            # Remove any previous build artifacts
+            if self._build_dir.exists():
+                shutil.rmtree(self._build_dir)
 
         # Create the build directory
-        self._build_dir.mkdir(exist_ok=False, parents=True)
+        self._build_dir.mkdir(exist_ok=True, parents=True)
 
         # Copy the Alire manifest
         create_file_from_template(
@@ -106,6 +107,7 @@ class TestCase:
             "--no-subprojects",
             "--report=all",
             "--warnings=error",
+            "--checks-as-errors=on", # Returns non-zero exit code when there are unproved checks
         ]
 
         j = conftest.get_gnatprove_jobs(self._request)
@@ -123,13 +125,6 @@ class TestCase:
             f.write(cp.stdout)
         with open(self._build_dir / "prove.stderr", "wb") as f:
             f.write(cp.stderr)
-
-        if conftest.get_baseline(self._request):
-            with open(self._test_case_dir / "prove.expected.stderr", "wb") as f:
-                f.write(cp.stderr)
-        else:
-            with open(self._test_case_dir / "prove.expected.stderr", "rb") as f:
-                assert cp.stderr.decode() == f.read().decode()
 
         return cp.returncode
 
@@ -150,7 +145,7 @@ def test_proof(request: pytest.FixtureRequest, test_dir: Path):
     tc.setup()
 
     res = tc.build()
-    assert res == 0
+    assert res == 0, "build failed. See build logs for details."
 
     res = tc.prove()
-    assert res == 0
+    assert res == 0, "proof failed. See prove logs for details."
