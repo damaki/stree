@@ -69,7 +69,9 @@ is
         SPARK.Big_Integers.Signed_Conversions (Count_Type);
 
       function To_Cursor (I : Positive_Count_Type) return Cursor is
-        (Cursor'(Node => I));
+        (Cursor'(Node => I))
+      with
+        Annotate => (GNATprove, Inline_For_Proof);
 
       -----------
       -- Paths --
@@ -156,32 +158,46 @@ is
       function Parent (M : Model_Type; C : Cursor) return Cursor is
         (M (C.Node).Parent)
       with
-        Pre => C /= No_Element;
+        Pre => C /= No_Element,
+        Annotate => (GNATprove, Inline_For_Proof);
 
       function Path (M : Model_Type; C : Cursor) return Way_Sequences.Sequence
       is
         (M (C.Node).Path)
       with
-        Pre => C /= No_Element;
+        Pre => C /= No_Element,
+        Annotate => (GNATprove, Inline_For_Proof);
 
       function Child (M : Model_Type; C : Cursor; W : Way_Type) return Cursor
       is
         (M (C.Node).Children (W))
       with
-        Pre => C /= No_Element;
+        Pre => C /= No_Element,
+        Annotate => (GNATprove, Inline_For_Proof);
+
+      function Children (M : Model_Type; C : Cursor) return Way_Cursor_Array is
+        (M (C.Node).Children)
+      with
+        Pre => C /= No_Element,
+        Annotate => (GNATprove, Inline_For_Proof);
 
       function Has_Element (M : Model_Type; C : Cursor) return Boolean is
-        (C /= No_Element and then M (C.Node).In_Tree);
+        (C /= No_Element and then M (C.Node).In_Tree)
+      with
+        Annotate => (GNATprove, Inline_For_Proof);
 
       function Direction (M : Model_Type; C : Cursor) return Way_Type is
         (M (C.Node).Way)
       with
-        Pre => C /= No_Element;
+        Pre => C /= No_Element,
+        Annotate => (GNATprove, Inline_For_Proof);
 
       function Is_Root (M : Model_Type; C : Cursor) return Boolean is
         (C /= No_Element
          and then M (C.Node).In_Tree
-         and then M (C.Node).Parent = No_Element);
+         and then M (C.Node).Parent = No_Element)
+      with
+        Annotate => (GNATprove, Inline_For_Proof);
 
       function Model (Container : Tree) return Model_Type with
         Global => null,
@@ -324,10 +340,10 @@ is
          Way       : Way_Type)
          return Boolean
       is
-        (M_Child (Container, Position, Way) /= No_Element)
+        (Has_Element (Model (Container), Position)
+         and then M_Child (Container, Position, Way) /= No_Element)
       with
-        Global => null,
-        Pre  => Has_Element (Model (Container), Position);
+        Global => null;
 
       function M_Has_Sibling
         (Container : Tree;
@@ -722,9 +738,9 @@ is
    with
      Inline,
      Global => null,
-     Post   => (if not Has_Element (Container, Position)
-                then Child'Result = No_Element
-                else Child'Result = M_Child (Container, Position, Way));
+     Post   => (if Has_Element (Container, Position)
+                then Child'Result = M_Child (Container, Position, Way)
+                else Child'Result = No_Element);
    --  Get a cursor to a child element of a node.
    --
    --  No_Element is returned if the node at the given Position does not have a
@@ -794,49 +810,70 @@ is
        --  The length of the container has incremented
        Length (Container) = Length (Container'Old) + 1
 
-       --  An element has been inserted as a child of the specified node
+       --  All previous nodes are still in the tree
        and then
-         Has_Element (Model (Container), M_Child (Container, Position, Way))
+         (for all I in Positive_Count_Type =>
+            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
+                Has_Element (Model (Container),     To_Cursor (I))))
 
-       --  A new node has been inserted as a child of the specified Position
+       --  The paths to all previous nodes is unchanged
        and then
-         Model (Container) (M_Child (Container, Position, Way).Node) =
-           (Path     => Way_Sequences.Add
-                          (Model (Container'Old) (Position.Node).Path, Way),
-            Parent   => Position,
-            Way      => Way,
-            Children => [others => No_Element],
-            In_Tree  => True)
+         (for all I in Positive_Count_Type =>
+            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
+               Path (Model (Container), To_Cursor (I)) =
+                 Path (Model (Container'Old), To_Cursor (I))))
 
-       --  The element at the new node is the New_Item
-       and then Equivalent_Elements
-                  (New_Item,
-                   Element (Container, M_Child (Container, Position, Way)))
-
-       --  All previously existing elements are unchanged
+       --  The parents of all previous nodes are unchanged
        and then
-         (for all I in Model_Type'Range =>
-            (if Model (Container'Old) (I).In_Tree then
-               Model (Container) (I).In_Tree
-               and then Equivalent_Elements
-                          (Element (Container'Old, To_Cursor (I)),
-                           Element (Container,     To_Cursor (I)))))
+         (for all I in Positive_Count_Type =>
+            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
+               Parent (Model (Container), To_Cursor (I)) =
+                 Parent (Model (Container'Old), To_Cursor (I))))
 
-       --  The tree structure is unchanged, except for the node at the
-       --  specified position.
-       and then M_Equivalent_Trees_Except (Container'Old, Container, Position)
-
-       --  The node at the specified Position is the same, except for the
-       --  addition of the new child node.
+       --  The direction to each node from its parent is unchanged
        and then
-         Model (Container) (Position.Node) =
-           (Model (Container'Old) (Position.Node)
-            with delta
-              Children => (Model (Container'Old) (Position.Node).Children
-                           with delta
-                             Way => M_Child (Container, Position, Way)))
+         (for all I in Positive_Count_Type =>
+            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
+               Direction (Model (Container), To_Cursor (I)) =
+                 Direction (Model (Container'Old), To_Cursor (I))))
 
-       --  The root of the tree is unchanged
+       --  The children of all nodes is unchanged, except for the node
+       --  at the specified Position.
+       and then
+         (for all I in Positive_Count_Type =>
+            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
+               (if To_Cursor (I) /= Position then
+                  Children (Model (Container), To_Cursor (I)) =
+                    Children (Model (Container'Old), To_Cursor (I)))))
+
+       --  The children of the node at Position are unchanged, except for
+       --  the child at the specified Way.
+       and then
+         (for all W in Way_Type =>
+            (if Child (Model (Container'Old), Position, W) /= No_Element
+                or else W = Way
+             then Child (Model (Container'Old), Position, W) /= No_Element
+             else Child (Model (Container'Old), Position, W) = No_Element))
+
+       --  The child of Position at the specified Way is now a valid node
+       and then Has_Element (Model (Container),
+                             Child (Model (Container), Position, Way))
+
+       --  The new child has the specified element
+       and then
+         Equivalent_Elements
+           (Element (Container, Child (Model (Container), Position, Way)),
+            New_Item)
+
+       --  All previous elements are unchanged
+       and then
+         (for all I in Positive_Count_Type =>
+            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
+               Equivalent_Elements
+                 (Element (Container,     To_Cursor (I)),
+                  Element (Container'Old, To_Cursor (I)))))
+
+       --  The root of the tree has not changed.
        and then Root (Container) = Root (Container'Old);
 
    procedure Insert_Parent
