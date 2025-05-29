@@ -173,6 +173,16 @@ is
       function Has_Element (M : Model_Type; C : Cursor) return Boolean is
         (C /= No_Element and then M (C.Node).In_Tree);
 
+      function Direction (M : Model_Type; C : Cursor) return Way_Type is
+        (M (C.Node).Way)
+      with
+        Pre => C /= No_Element;
+
+      function Is_Root (M : Model_Type; C : Cursor) return Boolean is
+        (C /= No_Element
+         and then M (C.Node).In_Tree
+         and then M (C.Node).Parent = No_Element);
+
       function Model (Container : Tree) return Model_Type with
         Global => null,
         Post   =>
@@ -245,6 +255,14 @@ is
                      (if Model'Result (J).In_Tree
                          and then Model'Result (J).Path = Model'Result (I).Path
                       then J = I))))
+
+           --  There is exactly one root in the tree
+           and then
+             (for all I in Model'Result'Range =>
+                (for all J in Model'Result'Range =>
+                   (if Is_Root (Model'Result, To_Cursor (I))
+                       and then Is_Root (Model'Result, To_Cursor (J))
+                    then I = J)))
 
            --  Nodes not in the tree have no children, no parent, and an empty
            --  path.
@@ -418,7 +436,6 @@ is
 
    use Formal_Model;
    use Formal_Model.Cursor_Sets;
-   use Formal_Model.Count_Type_Conversions;
 
    use type Formal_Model.Way_Sequences.Sequence;
 
@@ -817,13 +834,17 @@ is
             with delta
               Children => (Model (Container'Old) (Position.Node).Children
                            with delta
-                             Way => M_Child (Container, Position, Way)));
+                             Way => M_Child (Container, Position, Way)))
+
+       --  The root of the tree is unchanged
+       and then Root (Container) = Root (Container'Old);
 
    procedure Insert_Parent
      (Container : in out Tree;
       New_Item  :        Element_Type;
       Position  :        Cursor;
-      Way       :        Way_Type)
+      Way       :        Way_Type;
+      New_Node  :    out Cursor)
    with
      Global => null,
      Pre    => Has_Element (Container, Position)
@@ -832,42 +853,88 @@ is
        --  The length of the container has increased by one
        Length (Container) = Length (Container'Old) + 1
 
-       --  A new cursor has been added which references the new node
-       and then
-         All_Cursors (Container) = Add (All_Cursors (Container'Old),
-                                        M_Parent (Container, Position))
+       --  A new node has been created that did not exist before
+       and then Has_Element (Model (Container), New_Node)
+       and then not Has_Element (Model (Container'Old), New_Node)
 
-       --  A new node has been inserted at the requested position in the tree
-       and then Has_Element (Container, M_Parent (Container, Position))
-       and then Equivalent_Elements
-                  (New_Item,
-                   Element (Container, M_Parent (Container, Position)))
-       and then
-         Model (Container) (M_Parent (Container, Position).Node) =
-           (Path     => Way_Sequences.Add
-                          (Model (Container'Old) (Position.Node).Path, Way),
-            Parent   => M_Parent (Container'Old, Position),
-            Way      => Way,
-            Children => [Way => Position],
-            In_Tree  => True)
+       --  The new node is inserted in the tree at Position's old location
+       and then Path (Model (Container), New_Node) =
+                  Path (Model (Container'Old), Position)
+       and then Parent (Model (Container), New_Node) =
+                  Parent (Model (Container'Old), Position)
+       and then Direction (Model (Container), New_Node) =
+                  Direction (Model (Container'Old), Position)
 
+       --  The node at Position is now the child of New_Node
+       and then (for all W in Way_Type =>
+                   (if W = Way
+                    then Child (Model (Container), New_Node, W) = Position
+                    else Child (Model (Container), New_Node, W) = No_Element))
+       and then New_Node = Parent (Model (Container), Position)
+
+       --  The new node has the specified element
+       and then Equivalent_Elements (New_Item, Element (Container, New_Node))
+
+       --  All previous nodes still exist, and no other nodes have been
+       --  added except for the new node.
        and then
          (for all I in Positive_Count_Type =>
-            (if Model (Container'Old) (I).In_Tree then
+            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
+               Has_Element (Model (Container), To_Cursor (I))
+             elsif To_Cursor (I) /= New_Node then
+               not Has_Element (Model (Container), To_Cursor (I))))
+
+       --  All existing elements are unmodified
+       and then
+         (for all I in Positive_Count_Type =>
+            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
+               Equivalent_Elements
+                 (Element (Container,     To_Cursor (I)),
+                  Element (Container'Old, To_Cursor (I)))))
+
+       --  The tree model of nodes is unchanged, except for nodes in the
+       --  subtree rooted at Position which now have New_Node in their path.
+       and then
+         (for all I in Positive_Count_Type =>
+            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
                (
-                --  Nodes that are in the affected subtree have their paths
-                --  extended.
-                if Model (Container'Old) (Position.Node).Path <=
-                     Model (Container'Old) (I).Path
-                then Is_Insert (Model (Container'Old) (I).Path,
-                                Model (Container) (I).Path,
-                                From_Big_Integer
-                                  (Way_Sequences.Length (Model (Container'Old)
-                                                               (Position.Node)
-                                                               .Path) + 1),
-                                Way)
-                --  Otherwise the path to the node is unchanged
-                else Model (Container) (I) = Model (Container'Old) (I))));
+                --  The node at Position is now a child of New_Node
+                if To_Cursor (I) = Position then
+                  Model (Container) (I) =
+                    (Model (Container'Old) (I)
+                     with delta
+                       Parent => New_Node,
+                       Way    => Way,
+                       Path   => Way_Sequences.Add
+                                   (Model (Container'Old) (I).Path, Way))
+
+                --  Descendents of the node at Position have had their path
+                --  extended, but are otherwise unchanged.
+                elsif M_Is_Ancestor (Container'Old, Position, To_Cursor (I))
+                then
+                  M_Is_Ancestor (Container, Position, To_Cursor (I))
+                  and then Model (Container) (I).Parent =
+                             Model (Container'Old) (I).Parent
+                  and then Model (Container) (I).Children =
+                             Model (Container'Old) (I).Children
+                  and then Model (Container) (I).Way =
+                             Model (Container'Old) (I).Way
+                  and then
+                    Is_Insert (Path (Model (Container'Old), To_Cursor (I)),
+                               Path (Model (Container), To_Cursor (I)),
+                               M_Depth (Container'Old, Position) + 1,
+                               Way)
+
+                --  All other nodes not in the subtree of Position are
+                --  unchanged.
+                else Model (Container) (I) = Model (Container'Old) (I))))
+
+       --  If the node at Position was the root, then New_Node is now the root.
+       --  Otherwise, the root is unchanged
+       and then (if M_Is_Root (Container'Old, Position)
+                 then M_Is_Root (Container, New_Node)
+                      and then Root (Container) = New_Node
+                 else Root (Container) = Root (Container'Old));
    --  Insert a new item as a parent of the node at the specified Position.
    --
    --  For example, adding node F as the parent of C changes the tree as
