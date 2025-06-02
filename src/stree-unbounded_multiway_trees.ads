@@ -63,12 +63,12 @@ is
 
    package Formal_Model with Ghost is
 
-      subtype Positive_Count_Type is Count_Type range 1 .. Count_Type'Last;
+      subtype Valid_Cursor_Range is Count_Type range 1 .. Count_Type'Last;
 
       package Count_Type_Conversions is new
         SPARK.Big_Integers.Signed_Conversions (Count_Type);
 
-      function To_Cursor (I : Positive_Count_Type) return Cursor is
+      function To_Cursor (I : Count_Type) return Cursor is
         (Cursor'(Node => I))
       with
         Annotate => (GNATprove, Inline_For_Proof);
@@ -78,7 +78,7 @@ is
       -----------
 
       package Way_Sequences is new SPARK.Containers.Functional.Vectors
-        (Index_Type   => Positive_Count_Type,
+        (Index_Type   => Valid_Cursor_Range,
          Element_Type => Way_Type,
          "="          => "=");
       use Way_Sequences;
@@ -92,12 +92,12 @@ is
                     Get (V, I - Last (Q)) = Get (P, I)))
       with
         Pre =>
-          Length (Q) < To_Big_Integer (Integer (Positive_Count_Type'Last));
+          Length (Q) < To_Big_Integer (Integer (Valid_Cursor_Range'Last));
       --  Returns True if P is the concatenation of Q & V.
 
       function Is_Insert
         (V, P : Way_Sequences.Sequence;
-         I    : Positive_Count_Type;
+         I    : Valid_Cursor_Range;
          E    : Way_Type)
          return Boolean
       is
@@ -109,7 +109,7 @@ is
       with
         Pre => I in 1 .. Last (P)
                and then Length (P) <=
-                          To_Big_Integer (Integer (Positive_Count_Type'Last));
+                          To_Big_Integer (Integer (Valid_Cursor_Range'Last));
       --  Returns True if P is equal to V with element E inserted at index I
 
       function Is_Add
@@ -150,10 +150,10 @@ is
          --  are not in the tree.
       end record;
 
-      type Model_Type is array (Positive_Count_Type) of Model_Node with
+      type Model_Type is array (Valid_Cursor_Range) of Model_Node with
         Predicate => (for all N of Model_Type =>
                         Way_Sequences.Length (N.Path)
-                        < To_Big_Integer (Integer (Positive_Count_Type'Last)));
+                        < To_Big_Integer (Integer (Valid_Cursor_Range'Last)));
 
       function Parent (M : Model_Type; C : Cursor) return Cursor is
         (M (C.Node).Parent)
@@ -740,27 +740,27 @@ is
 
        --  All previous nodes are still in the tree
        and then
-         (for all I in Positive_Count_Type =>
+         (for all I in Valid_Cursor_Range =>
             (if Has_Element (Model (Container'Old), To_Cursor (I)) then
                 Has_Element (Model (Container),     To_Cursor (I))))
 
        --  The paths to all previous nodes is unchanged
        and then
-         (for all I in Positive_Count_Type =>
+         (for all I in Valid_Cursor_Range =>
             (if Has_Element (Model (Container'Old), To_Cursor (I)) then
                Path (Model (Container), To_Cursor (I)) =
                  Path (Model (Container'Old), To_Cursor (I))))
 
        --  The parents of all previous nodes are unchanged
        and then
-         (for all I in Positive_Count_Type =>
+         (for all I in Valid_Cursor_Range =>
             (if Has_Element (Model (Container'Old), To_Cursor (I)) then
                Parent (Model (Container), To_Cursor (I)) =
                  Parent (Model (Container'Old), To_Cursor (I))))
 
        --  The direction to each node from its parent is unchanged
        and then
-         (for all I in Positive_Count_Type =>
+         (for all I in Valid_Cursor_Range =>
             (if Has_Element (Model (Container'Old), To_Cursor (I)) then
                Direction (Model (Container), To_Cursor (I)) =
                  Direction (Model (Container'Old), To_Cursor (I))))
@@ -768,7 +768,7 @@ is
        --  The children of all nodes is unchanged, except for the node
        --  at the specified Position.
        and then
-         (for all I in Positive_Count_Type =>
+         (for all I in Valid_Cursor_Range =>
             (if Has_Element (Model (Container'Old), To_Cursor (I)) then
                (if To_Cursor (I) /= Position then
                   Children (Model (Container), To_Cursor (I)) =
@@ -795,7 +795,7 @@ is
 
        --  All previous elements are unchanged
        and then
-         (for all I in Positive_Count_Type =>
+         (for all I in Valid_Cursor_Range =>
             (if Has_Element (Model (Container'Old), To_Cursor (I)) then
                Equivalent_Elements
                  (Element (Container,     To_Cursor (I)),
@@ -825,13 +825,13 @@ is
 
        --  All previous nodes still exist
        and then
-         (for all I in Positive_Count_Type =>
+         (for all I in Valid_Cursor_Range =>
             (if Has_Element (Model (Container'Old), To_Cursor (I)) then
                 Has_Element (Model (Container),     To_Cursor (I))))
 
        --  All previously existing elements are unmodified
        and then
-         (for all I in Positive_Count_Type =>
+         (for all I in Valid_Cursor_Range =>
             (if Has_Element (Model (Container'Old), To_Cursor (I)) then
                Equivalent_Elements
                  (Element (Container,     To_Cursor (I)),
@@ -840,7 +840,7 @@ is
        --  All nodes not in the subtree rooted by the node at Position,
        --  or the previous parent of Position, are unchanged.
        and then
-         (for all I in Positive_Count_Type =>
+         (for all I in Valid_Cursor_Range =>
             (if not In_Subtree (Model (Container'Old), Position, To_Cursor (I))
                 and then
                   To_Cursor (I) /= Parent (Model (Container'Old), Position)
@@ -848,7 +848,7 @@ is
 
        --  The paths to all nodes not in the affected subtree are unchanged
        and then
-         (for all I in Positive_Count_Type =>
+         (for all I in Valid_Cursor_Range =>
             (if Has_Element (Model (Container'Old), To_Cursor (I)) then
                (if not In_Subtree
                          (Model (Container'Old), Position, To_Cursor (I))
@@ -858,7 +858,7 @@ is
        --  The parents of all nodes is unchanged, except for the node at
        --  Position.
        and then
-         (for all I in Positive_Count_Type =>
+         (for all I in Valid_Cursor_Range =>
             (if Has_Element (Model (Container'Old), To_Cursor (I))
                 and then To_Cursor (I) /= Position
              then Parent (Model (Container), To_Cursor (I)) =
@@ -867,7 +867,7 @@ is
        --  The children of all nodes in the tree are unchanged, except for
        --  the old parent of the node at Position.
        and then
-         (for all I in Positive_Count_Type =>
+         (for all I in Valid_Cursor_Range =>
             (if Has_Element (Model (Container'Old), To_Cursor (I)) then
                (if To_Cursor (I) /= Parent (Model (Container'Old), Position)
                 then Children (Model (Container),     To_Cursor (I)) =
@@ -951,7 +951,7 @@ is
 
                --  Other elements are preserved
                and then
-                 (for all I in Positive_Count_Type =>
+                 (for all I in Valid_Cursor_Range =>
                     (if Model (Container.all'Old) (I).In_Tree
                         and then I /= Position.Node
                      then Equivalent_Elements
