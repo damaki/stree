@@ -22,7 +22,8 @@ is
       pragma Assert (Child (T, Node_1, Right) = No_Element);
 
       --  Change tree structure to: 2 -> 1
-      Insert_Parent (T, 2, Node_1, Left, Node_2);
+      Insert_Parent (T, 2, Node_1, Left);
+      Node_2 := Parent (T, Node_1);
       pragma Assert (Length (T) = 2);
       pragma Assert (Root_Element (T) = 2);
       pragma Assert (Element (T, Node_1) = 1);
@@ -32,7 +33,8 @@ is
       pragma Assert (Is_Ancestor (T, Node_2, Node_1));
 
       --  Change tree structure to: 2 -> 3 -> 1
-      Insert_Parent (T, 3, Node_1, Middle, Node_3);
+      Insert_Parent (T, 3, Node_1, Middle);
+      Node_3 := Parent (T, Node_1);
       pragma Assert (Length (T) = 3);
       pragma Assert (Element (T, Node_1) = 1);
       pragma Assert (Element (T, Node_2) = 2);

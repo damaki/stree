@@ -712,10 +712,10 @@ is
      (Container : in out Tree;
       New_Item  :        Element_Type;
       Position  :        Cursor;
-      Way       :        Way_Type;
-      New_Node  :    out Cursor)
+      Way       :        Way_Type)
    is
       Parent_Pos : constant Cursor := Parent (Container, Position);
+      New_Node   : Cursor;
    begin
       --  Create the new node
 
