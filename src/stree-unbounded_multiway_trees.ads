@@ -4,7 +4,6 @@
 --  SPDX-License-Identifier: Apache-2.0
 --
 with SPARK.Big_Integers;                  use SPARK.Big_Integers;
-with SPARK.Containers.Functional.Sets;
 with SPARK.Containers.Types;              use SPARK.Containers.Types;
 with SPARK.Containers.Functional.Vectors;
 
@@ -352,26 +351,9 @@ is
                    and then N.Way = Way_Type'First
                    and then (for all C of N.Children => C = No_Element)));
 
-      -------------
-      -- Cursors --
-      -------------
-
-      package Cursor_Sets is new SPARK.Containers.Functional.Sets
-        (Element_Type => Cursor);
-      use Cursor_Sets;
-
-      function All_Cursors (Container : Tree) return Cursor_Sets.Set with
-        Global => null,
-        Post   => --  The set contains only cursors that are in the container
-                  (for all I in Count_Type =>
-                     Has_Element (Model (Container), Cursor'(Node => I)) =
-                       Contains (All_Cursors'Result, Cursor'(Node => I)));
-      --  Get the set of all valid cursors in the tree
-
    end Formal_Model;
 
    use Formal_Model;
-   use Formal_Model.Cursor_Sets;
 
    use type Formal_Model.Way_Sequences.Sequence;
 

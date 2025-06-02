@@ -3,24 +3,20 @@
 --
 --  SPDX-License-Identifier: Apache-2.0
 --
+with SPARK.Containers.Functional.Sets;
+
 package body Stree.Unbounded_Multiway_Trees with
   SPARK_Mode => Off
 is
 
    package body Formal_Model is
 
-      function All_Cursors (Container : Tree) return Cursor_Sets.Set is
-         S : Cursor_Sets.Set;
-      begin
-         for I in 1 .. Node_Vectors.Last_Index (Container.Nodes) loop
-            S := Add (S, Cursor'(Node => I));
-         end loop;
-
-         return S;
-      end All_Cursors;
+      package Cursor_Sets is new SPARK.Containers.Functional.Sets
+        (Element_Type => Cursor);
 
       function Model (Container : Tree) return Model_Type is
          use Node_Vectors;
+         use Cursor_Sets;
 
          Todo : Cursor_Sets.Set;
          C    : Cursor;
