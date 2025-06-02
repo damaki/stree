@@ -398,6 +398,26 @@ is
      Pre => Has_Element (Container, Position);
    --  Get the element at the specified position in the tree
 
+   procedure Replace_Element
+     (Container : in out Tree;
+      Position  :        Cursor;
+      New_Item  :        Element_Type)
+   with
+     Global => null,
+     Pre    => Has_Element (Model (Container), Position),
+     Post   => --  The element is updated with the new value
+               Equivalent_Elements (Element (Container, Position), New_Item)
+
+               --  The tree structure is unchanged.
+               and then Model (Container) = Model (Container'Old)
+
+               --  All other elements are unchanged
+               and then (for all I in Valid_Cursor_Range =>
+                           (if To_Cursor (I) /= Position then
+                              Equivalent_Elements
+                                (Element (Container'Old, To_Cursor (I)),
+                                 Element (Container, To_Cursor (I)))));
+
    function Is_Root
      (Container : Tree;
       Position  : Cursor)

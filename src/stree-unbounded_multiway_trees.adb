@@ -111,6 +111,29 @@ is
    is
      (Node_Vectors.Element (Container.Nodes, Position.Node).Element);
 
+   ---------------------
+   -- Replace_Element --
+   ---------------------
+
+   procedure Replace_Element
+     (Container : in out Tree;
+      Position  :        Cursor;
+      New_Item  :        Element_Type)
+   is
+   begin
+      if not Has_Element (Container, Position) then
+         raise Constraint_Error with "Invalid cursor";
+      end if;
+
+      declare
+         Node_Acc : constant not null access Node_Type :=
+                      Node_Vectors.Reference
+                        (Container.Nodes'Access, Position.Node);
+      begin
+         Node_Acc.all.Element := New_Item;
+      end;
+   end Replace_Element;
+
    -------------
    -- Is_Root --
    -------------
