@@ -409,6 +409,9 @@ is
    with
      Global => null,
      Post   => Is_Leaf'Result = Is_Leaf (Model (Container), Position);
+   --  Query if a cursor references a leaf node in the tree.
+   --
+   --  A leaf node is any node in the tree that has no children.
 
    function Root (Container : Tree) return Cursor with
      Global => null,
