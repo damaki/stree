@@ -9,6 +9,29 @@ with SPARK.Containers.Functional.Vectors;
 
 private with SPARK.Containers.Formal.Unbounded_Vectors;
 
+--  This package implements an unbounded multi-way tree container.
+--
+--  The order of the tree is determined by the range of the type Way_Type,
+--  which can be any discrete type (integer, modular, or enumeration type).
+--
+--  Each node in the tree holds exactly one element.
+--
+--  Nodes are inserted into the tree using the following procedures:
+--   * Insert_Root: Creates the initial (root) node in an empty tree.
+--   * Insert_Child: Create a new node that is a child of another node.
+--   * Insert_Parent: Create a new node and insert it as the parent of another
+--     node.
+--
+--  Iteration over the tree is available using the First, Next, and Has_Element
+--  procedures. Iteration always occurs in depth-first order. The tree can
+--  be iterated over using iterator loops. "for .. in" loops iterate over
+--  cursors, and "for .. of" loops iterate over elements.
+--
+--  Reverse iteration is also possible using the functions Last, Prev, and
+--  Has_Element.
+--
+--  Quantification over trees is also available using "for all" and "for some".
+
 generic
    type Element_Type is private;
    type Way_Type is (<>);
@@ -418,12 +441,14 @@ is
      Contract_Cases =>
        (Is_Empty (Container) => Last'Result = No_Element,
         others               => Has_Element (Model (Container), Last'Result));
+   --  Get a cursor to the last element in the tree.
 
    function Last_Element (Container : Tree) return Element_Type is
      (Element (Container, Last (Container)))
    with
      Global => null,
      Pre    => not Is_Empty (Container);
+   --  Get the last element in the tree.
 
    function Next
      (Container : Tree;
@@ -439,6 +464,9 @@ is
                --  returned.
                and then (if Next'Result /= No_Element then
                            Has_Element (Model (Container), Position));
+   --  Get the next element in the tree.
+   --
+   --  The next node is retrieved in depth-first order.
 
    function Prev
      (Container : Tree;
@@ -454,6 +482,9 @@ is
                --  returned.
                and then (if Prev'Result /= No_Element then
                            Has_Element (Model (Container), Position));
+   --  Get the previous element in the tree.
+   --
+   --  The previous node is retrieved in reverse depth-first order.
 
    function First_Child
      (Container : Tree;
