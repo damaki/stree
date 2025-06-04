@@ -945,6 +945,97 @@ is
    --                           / \
    --                          D   E
 
+   procedure Splice_Subtree
+     (Container    : in out Tree;
+      Subtree_Root :        Cursor;
+      New_Parent   :        Cursor;
+      Way          :        Way_Type)
+   with
+     Global => null,
+     Pre    =>
+       Has_Element (Container, Subtree_Root)
+       and then Has_Element (Container, New_Parent)
+
+       --  The child slot in the new parent must be empty
+       --  (cannot overwrite an existing node).
+       and then Child (Model (Container), New_Parent, Way) = No_Element
+
+       --  The new parent cannot be in the subtree that is being moved
+       --  as this would lead to a cycle in the tree.
+       and then not In_Subtree (Model (Container), New_Parent, Subtree_Root),
+     Post =>
+       --  No nodes are added or removed
+       (for all I in Valid_Cursor_Range =>
+          Has_Element (Model (Container),     To_Cursor (I)) =
+          Has_Element (Model (Container'Old), To_Cursor (I)))
+
+       --  All elements are unchanged
+       and then
+         (for all I in Valid_Cursor_Range =>
+            (if Has_Element (Model (Container), To_Cursor (I)) then
+               Equivalent_Elements
+                 (Element (Container,     To_Cursor (I)),
+                  Element (Container'Old, To_Cursor (I)))))
+
+       --  The path to all nodes not in the subtree is unchanged
+       and then
+         (for all I in Valid_Cursor_Range =>
+            (if not In_Subtree
+                      (Model (Container'Old), Subtree_Root, To_Cursor (I))
+             then Path (Model (Container), To_Cursor (I)) =
+                  Path (Model (Container'Old), To_Cursor (I))))
+
+       --  The parent of all nodes is unchanged, except for Subtree_Root
+       and then
+         (for all I in Valid_Cursor_Range =>
+            (if To_Cursor (I) /= Subtree_Root then
+               Parent (Model (Container),     To_Cursor (I)) =
+               Parent (Model (Container'Old), To_Cursor (I))))
+
+       --  The subtree root has a new parent
+       and then Parent (Model (Container), Subtree_Root) = New_Parent
+
+       --  The paths of all nodes not in the subtree are unchanged
+       and then
+         (for all I in Valid_Cursor_Range =>
+            (if not In_Subtree
+                      (Model (Container'Old), Subtree_Root, To_Cursor (I))
+             then Path (Model (Container),     To_Cursor (I)) =
+                  Path (Model (Container'Old), To_Cursor (I))))
+
+       --  The paths between all nodes in the subtree is preserved
+       and then
+         (for all I in Valid_Cursor_Range =>
+            (for all J in Valid_Cursor_Range =>
+               (if In_Subtree (Model (Container'Old),
+                               Subtree_Root,
+                               To_Cursor (I))
+                   and then Is_Ancestor (Model (Container'Old),
+                                         To_Cursor (I),
+                                         To_Cursor (J))
+                then Is_Ancestor (Model (Container),
+                                  To_Cursor (I),
+                                  To_Cursor (J)))))
+
+       --  If the subtree is being spliced to a different parent, then the
+       --  subtree root is removed as the child of its old parent.
+       and then
+         (if Parent (Model (Container'Old), Subtree_Root) /= New_Parent then
+            Child (Model (Container),
+                   Parent (Model (Container'Old), Subtree_Root),
+                   Direction (Model (Container'Old), Subtree_Root))
+            = No_Element);
+   --  Insert a new item as a parent of the node at the specified Position.
+   --
+   --  For example, splicing node C (Subtree_Root) to node B (New_Parent):
+   --         A              A
+   --        / \            /
+   --       B   C    ===>  B
+   --          / \          \
+   --         D   E          C
+   --                       / \
+   --                      D   E
+
    function At_End (E : access constant Tree) return access constant Tree is
      (E)
    with

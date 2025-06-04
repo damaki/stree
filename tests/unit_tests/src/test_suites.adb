@@ -17,6 +17,7 @@ with Tree_Tests.Parent_Tests;
 with Tree_Tests.Prev_Tests;
 with Tree_Tests.Root_Element_Tests;
 with Tree_Tests.Root_Tests;
+with Tree_Tests.Splice_Subtree_Tests;
 
 package body Test_Suites
 is
@@ -39,6 +40,7 @@ is
       Tree_Tests.Prev_Tests.Add_To_Suite (S.all);
       Tree_Tests.Root_Element_Tests.Add_To_Suite (S.all);
       Tree_Tests.Root_Tests.Add_To_Suite (S.all);
+      Tree_Tests.Splice_Subtree_Tests.Add_To_Suite (S.all);
 
       return S;
    end Suite;

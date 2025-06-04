@@ -787,6 +787,60 @@ is
       end if;
    end Insert_Parent;
 
+   --------------------
+   -- Splice_Subtree --
+   --------------------
+
+   procedure Splice_Subtree
+     (Container    : in out Tree;
+      Subtree_Root :        Cursor;
+      New_Parent   :        Cursor;
+      Way          :        Way_Type)
+   is
+   begin
+      if not Has_Element (Container, Subtree_Root)
+         or else not Has_Element (Container, New_Parent)
+      then
+         raise Constraint_Error with "Invalid cursor";
+      end if;
+
+      if Child (Container, New_Parent, Way) /= No_Element then
+         raise Constraint_Error with
+           "New_Parent already has a child at the requested Way";
+      end if;
+
+      if New_Parent = Subtree_Root or else
+         Is_Ancestor (Container, Subtree_Root, New_Parent)
+      then
+         raise Constraint_Error with "Splice would result in a cycle";
+      end if;
+
+      declare
+         ST_Node_Acc : constant not null access Node_Type :=
+                         Node_Vectors.Reference
+                           (Container.Nodes'Access, Subtree_Root.Node);
+
+         Old_Parent_Acc : constant not null access Node_Type :=
+                            Node_Vectors.Reference
+                              (Container.Nodes'Access,
+                               ST_Node_Acc.all.Parent.Node);
+
+         New_Parent_Acc : constant not null access Node_Type :=
+                            Node_Vectors.Reference
+                              (Container.Nodes'Access, New_Parent.Node);
+      begin
+         --  Unlink the Subtree_Root from its old parent
+         Old_Parent_Acc.all.Ways (ST_Node_Acc.all.Position) := No_Element;
+
+         --  Link the Subtree_Root to its new parent
+         New_Parent_Acc.all.Ways (Way) := Subtree_Root;
+
+         --  Update Subtree_Root to reference its new parent
+         ST_Node_Acc.all.Parent   := New_Parent;
+         ST_Node_Acc.all.Position := Way;
+      end;
+   end Splice_Subtree;
+
    ------------------------
    -- Constant_Reference --
    ------------------------
