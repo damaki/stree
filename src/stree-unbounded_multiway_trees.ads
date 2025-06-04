@@ -68,15 +68,6 @@ is
      Post   => Is_Empty (Empty_Tree'Result);
    --  Create an empty tree
 
-   function Is_Empty (Container : Tree) return Boolean with
-     Global => null;
-   --  Query if the tree contains no elements
-
-   function Length (Container : Tree) return Count_Type with
-     Global => null,
-     Post   => Is_Empty (Container) = (Length'Result = 0);
-   --  Get the number of elements in the tree
-
    pragma Unevaluated_Use_Of_Old (Allow);
 
    ------------------
@@ -176,6 +167,11 @@ is
         Predicate => (for all N of Model_Type =>
                         Way_Sequences.Length (N.Path)
                         < To_Big_Integer (Integer (Valid_Cursor_Range'Last)));
+
+      function Is_Empty (M : Model_Type) return Boolean is
+        (for all N of M => not N.In_Tree)
+      with
+        Annotate => (GNATprove, Inline_For_Proof);
 
       function Parent (M : Model_Type; C : Cursor) return Cursor is
         (M (C.Node).Parent)
@@ -286,18 +282,13 @@ is
       function Model (Container : Tree) return Model_Type with
         Global => null,
         Post   =>
-          --  If the tree is empty then there are no nodes in the tree,
-          --  otherwise there is at least one node.
-          Is_Empty (Container) = (for all N of Model'Result => not N.In_Tree)
-
           --  All nodes not in the tree have no parent or children, and have
           --  an empty path
-          and then
-            (for all N of Model'Result =>
-               (if not N.In_Tree then
-                  N.Parent = No_Element
-                  and then Length (N.Path) = 0
-                  and then (for all C of N.Children => C = No_Element)))
+          (for all N of Model'Result =>
+             (if not N.In_Tree then
+                N.Parent = No_Element
+                and then Length (N.Path) = 0
+                and then (for all C of N.Children => C = No_Element)))
 
           --  For the root node (i.e. the node with no parent), the path to
           --  itself is empty. For all other nodes the path is non-empty.
@@ -379,6 +370,16 @@ is
    use Formal_Model;
 
    use type Formal_Model.Way_Sequences.Sequence;
+
+   function Is_Empty (Container : Tree) return Boolean with
+     Global => null,
+     Post   => Is_Empty'Result = Is_Empty (Model (Container));
+   --  Query if the tree contains no elements
+
+   function Length (Container : Tree) return Count_Type with
+     Global => null,
+     Post   => Is_Empty (Model (Container)) = (Length'Result = 0);
+   --  Get the number of elements in the tree
 
    function Has_Element
      (Container : Tree;
@@ -1075,7 +1076,7 @@ is
                Model (Container.all'Old) = Model (At_End (Container).all)
 
                --  The length is preserved
-               and then Length (Container) = Length (Container'Old)
+               and then Length (Container.all) = Length (Container.all'Old)
 
                --  Other elements are preserved
                and then
