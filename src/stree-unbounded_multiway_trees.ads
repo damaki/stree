@@ -965,9 +965,10 @@ is
        and then not In_Subtree (Model (Container), New_Parent, Subtree_Root),
      Post =>
        --  No nodes are added or removed
-       (for all I in Valid_Cursor_Range =>
-          Has_Element (Model (Container),     To_Cursor (I)) =
-          Has_Element (Model (Container'Old), To_Cursor (I)))
+       Length (Container) = Length (Container'Old)
+       and then (for all I in Valid_Cursor_Range =>
+                   Has_Element (Model (Container),     To_Cursor (I)) =
+                   Has_Element (Model (Container'Old), To_Cursor (I)))
 
        --  All elements are unchanged
        and then
