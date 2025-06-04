@@ -1074,6 +1074,9 @@ is
      Post   => --  The tree structure is preserved
                Model (Container.all'Old) = Model (At_End (Container).all)
 
+               --  The length is preserved
+               and then Length (Container) = Length (Container'Old)
+
                --  Other elements are preserved
                and then
                  (for all I in Valid_Cursor_Range =>
