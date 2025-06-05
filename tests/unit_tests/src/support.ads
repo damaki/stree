@@ -16,6 +16,8 @@ package Support is
      array (Integer range <>, Trees.Way_Type range <>)
      of Trees.Cursor;
 
+   type Boolean_Map is array (Integer range <>) of Boolean;
+
    procedure Insert_Child
      (Container : in out Trees.Tree;
       New_Item  :        Integer;
@@ -55,5 +57,22 @@ package Support is
             and then Nodes'Last = Expected_Children'Last (1);
    --  Check that each child of each node in Nodes is equal to the associated
    --  value in Expected_Children at the same index.
+
+   procedure Check_Has_Elements
+     (Container         : Trees.Tree;
+      Nodes             : Cursor_Map;
+      Expected_Elements : Boolean_Map)
+   with
+     Pre => Nodes'First = Expected_Elements'First
+            and then Nodes'Last = Expected_Elements'Last;
+   --  Check that, for each cursor in Nodes, Has_Element on that cursor
+   --  returns the value (True or False) for the corresponding index in
+   --  Expected_Elements.
+
+   procedure Check_Elements
+     (Container : Trees.Tree;
+      Nodes     : Cursor_Map);
+   --  Check that calling Element for each entry in Nodes is equal to the
+   --  index in Nodes. I.e. check that Element (Container, Nodes (X)) = X.
 
 end Support;

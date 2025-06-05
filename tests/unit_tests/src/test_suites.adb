@@ -3,6 +3,7 @@
 --
 --  SPDX-License-Identifier: Apache-2.0
 --
+with Tree_Tests.Delete_Tests;
 with Tree_Tests.Element_Tests;
 with Tree_Tests.Empty_Tree_Tests;
 with Tree_Tests.First_Tests;
@@ -26,6 +27,7 @@ is
    is
       S : constant Access_Test_Suite := new Test_Suite;
    begin
+      Tree_Tests.Delete_Tests.Add_To_Suite (S.all);
       Tree_Tests.Element_Tests.Add_To_Suite (S.all);
       Tree_Tests.Empty_Tree_Tests.Add_To_Suite (S.all);
       Tree_Tests.First_Tests.Add_To_Suite (S.all);

@@ -946,6 +946,58 @@ is
    --                           / \
    --                          D   E
 
+   procedure Delete
+     (Container : in out Tree;
+      Position  :        Cursor)
+   with
+     Global => null,
+     Pre    => Has_Element (Model (Container), Position),
+     Post   =>
+       Length (Container) < Length (Container'Old)
+
+       --  All nodes not in the deleted subtree are preserved
+       and then
+         (for all I in Valid_Cursor_Range =>
+            Has_Element (Model (Container), To_Cursor (I)) =
+            (Has_Element (Model (Container'Old), To_Cursor (I))
+             and then not In_Subtree
+                            (Model (Container'Old), Position, To_Cursor (I))))
+
+       --  The elements and tree structure of all nodes not in the affected
+       --  subtree are preserved.
+       and then
+         (for all I in Valid_Cursor_Range =>
+            (if Has_Element (Model (Container'Old), To_Cursor (I))
+                and then not In_Subtree
+                               (Model (Container'Old), Position, To_Cursor (I))
+             then Equivalent_Elements
+                    (Element (Container,     To_Cursor (I)),
+                     Element (Container'Old, To_Cursor (I)))
+                  and then Parent (Model (Container),     To_Cursor (I)) =
+                           Parent (Model (Container'Old), To_Cursor (I))
+                  and then Path (Model (Container),     To_Cursor (I)) =
+                           Path (Model (Container'Old), To_Cursor (I))))
+
+       --  The children of all nodes not in the affected subtree is preserved,
+       --  except for the parent of the affected subtree which no longer has
+       --  a child in the direction of the deleted subtree.
+       and then
+         (for all I in Valid_Cursor_Range =>
+            (if Has_Element (Model (Container'Old), To_Cursor (I))
+                and then not In_Subtree
+                               (Model (Container'Old), Position, To_Cursor (I))
+             then (if To_Cursor (I) = Parent (Model (Container'Old), Position)
+                   then Children (Model (Container), To_Cursor (I)) =
+                        (Children (Model (Container'Old), To_Cursor (I))
+                         with delta
+                           Direction (Model (Container'Old), Position) =>
+                             No_Element))
+                   else Children (Model (Container),     To_Cursor (I)) =
+                        Children (Model (Container'Old), To_Cursor (I))));
+   --  Delete a node from the tree.
+   --
+   --  If the node has any child nodes then they are also deleted.
+
    procedure Splice_Subtree
      (Container    : in out Tree;
       Subtree_Root :        Cursor;
@@ -1100,11 +1152,47 @@ private
 
    subtype Index_Type is Count_Type range 1 .. Count_Type'Last;
 
+   --  The tree nodes are stored in a vector. Each vector contains references
+   --  (cursors) to its parent and child nodes which determine the tree
+   --  structure.
+   --
+   --  Cursors are simply indices into the underlying node vector.
+   --
+   --  When deleting nodes, the node might be in the middle of the vector
+   --  which prevents us from simply removing the node from the vector, as this
+   --  would shift other nodes in the vector, possibly invalidating cursors.
+   --
+   --  Instead, when deleting nodes, they are moved to a linked list of free
+   --  nodes. When inserting new nodes into the tree, the free list is
+   --  checked first and a node is taken from there if one is available.
+   --  If the free list is empty, then new nodes are allocated by appending to
+   --  the node vector.
+   --
+   --  This also means that we can't simply use the node vector's length as
+   --  the tree length, since some nodes in the vector might be deleted
+   --  (i.e., in the free list). Instead, a Length counter is maintained that
+   --  is incremented for each node inserted into the tree, and decremented
+   --  for each node deleted from the tree.
+
    type Node_Type is record
       Element  : aliased Element_Type;
+      --  The element stored in this node.
+
       Parent   : Cursor;
+      --  Reference to the parent node in the tree
+      --
+      --  This is No_Element if the node is the root of the tree
+
       Position : Way_Type;
+      --  The position of the node relative to its parent, i.e. which way
+      --  (edge) to take from the parent node to this node.
+
       Ways     : Way_Cursor_Array;
+      --  Holds references to child nodes for each way from this node
+
+      Free     : Boolean;
+      --  True if this node has been deleted and is in the free list.
+      --  False if this node is in use.
    end record;
 
    package Node_Vectors is new SPARK.Containers.Formal.Unbounded_Vectors
@@ -1113,13 +1201,10 @@ private
       "="          => "=");
 
    type Tree is record
-      Nodes : aliased Node_Vectors.Vector := Node_Vectors.Empty_Vector;
-      Root  : Cursor                      := No_Element;
+      Nodes     : aliased Node_Vectors.Vector := Node_Vectors.Empty_Vector;
+      Root      : Cursor                      := No_Element;
+      Free_List : Cursor                      := No_Element;
+      Length    : Count_Type                  := 0;
    end record;
-
-   function Last_In_Subtree
-     (Container    : Tree;
-      Subtree_Root : Cursor)
-      return Cursor;
 
 end Stree.Unbounded_Multiway_Trees;

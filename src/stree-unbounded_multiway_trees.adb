@@ -9,6 +9,24 @@ package body Stree.Unbounded_Multiway_Trees with
   SPARK_Mode => Off
 is
 
+   function Last_In_Subtree
+     (Container    : Tree;
+      Subtree_Root : Cursor)
+      return Cursor;
+   --  Get the last node in a subtree
+
+   procedure Alloc_From_Free_List
+     (Container : in out Tree;
+      Node      :    out Cursor);
+   --  Try and allocate a node from the free list.
+   --
+   --  If the free list is empty, then No_Element is returned.
+
+   procedure Add_To_Free_List_Recursive
+     (Container : in out Tree;
+      Node      :        Cursor);
+   --  Add a node (and its children) to the free list
+
    package body Formal_Model is
 
       package Cursor_Sets is new SPARK.Containers.Functional.Sets
@@ -72,15 +90,17 @@ is
    ----------------
 
    function Empty_Tree return Tree is
-     ((Nodes => Node_Vectors.Empty_Vector,
-       Root  => No_Element));
+     ((Nodes     => Node_Vectors.Empty_Vector,
+       Root      => No_Element,
+       Free_List => No_Element,
+       Length    => 0));
 
    ------------
    -- Length --
    ------------
 
    function Length (Container : Tree) return Count_Type is
-     (Node_Vectors.Length (Container.Nodes));
+     (Container.Length);
 
    --------------
    -- Is_Empty --
@@ -98,7 +118,19 @@ is
       Position  : Cursor)
       return Boolean
    is
-     (Node_Vectors.Has_Element (Container.Nodes, Position.Node));
+   begin
+      if not Node_Vectors.Has_Element (Container.Nodes, Position.Node) then
+         return False;
+      end if;
+
+      declare
+         Node_Acc : constant not null access constant Node_Type :=
+                      Node_Vectors.Constant_Reference
+                        (Container.Nodes, Position.Node);
+      begin
+         return not Node_Acc.all.Free;
+      end;
+   end Has_Element;
 
    -------------
    -- Element --
@@ -689,10 +721,13 @@ is
       Container.Nodes := [(Element  => New_Item,
                            Parent   => No_Element,
                            Position => Way_Type'First,
-                           Ways     => [others => No_Element])];
+                           Ways     => [others => No_Element],
+                           Free     => False)];
 
       Container.Root :=
         Cursor'(Node => Node_Vectors.First_Index (Container.Nodes));
+
+      Container.Length := 1;
    end Insert_Root;
 
    ------------------
@@ -705,13 +740,35 @@ is
       Position  :        Cursor;
       Way       :        Way_Type)
    is
+      Node : Cursor;
    begin
-      Node_Vectors.Append
-        (Container => Container.Nodes,
-         New_Item  => Node_Type'(Element  => New_Item,
-                                 Parent   => Position,
-                                 Position => Way,
-                                 Ways     => [others => No_Element]));
+      Alloc_From_Free_List (Container, Node);
+
+      if Node /= No_Element then
+         declare
+            Node_Acc : constant not null access Node_Type :=
+                         Node_Vectors.Reference
+                           (Container.Nodes'Access, Node.Node);
+         begin
+            Node_Acc.all := Node_Type'(Element  => New_Item,
+                                       Parent   => Position,
+                                       Position => Way,
+                                       Ways     => [others => No_Element],
+                                       Free     => False);
+         end;
+      else
+         --  Free list is empty. Create a new node.
+
+         Node_Vectors.Append
+           (Container => Container.Nodes,
+            New_Item  => Node_Type'(Element  => New_Item,
+                                    Parent   => Position,
+                                    Position => Way,
+                                    Ways     => [others => No_Element],
+                                    Free     => False));
+      end if;
+
+      Container.Length := Container.Length + 1;
 
       declare
          Parent_Acc : constant not null access Node_Type :=
@@ -738,15 +795,38 @@ is
    begin
       --  Create the new node
 
-      Node_Vectors.Append
-        (Container => Container.Nodes,
-         New_Item  => Node_Type'
-                        (Element  => New_Item,
-                         Parent   => Parent_Pos,
-                         Position => Direction (Container, Parent_Pos),
-                         Ways     => [others => No_Element]));
+      Alloc_From_Free_List (Container, New_Node);
 
-      New_Node := Cursor'(Node => Node_Vectors.Last_Index (Container.Nodes));
+      if New_Node /= No_Element then
+         declare
+            Node_Acc : constant not null access Node_Type :=
+                         Node_Vectors.Reference
+                           (Container.Nodes'Access, New_Node.Node);
+         begin
+            Node_Acc.all := Node_Type'
+                              (Element  => New_Item,
+                               Parent   => Parent_Pos,
+                               Position => Direction (Container, Parent_Pos),
+                               Ways     => [others => No_Element],
+                               Free     => False);
+         end;
+      else
+         --  Free list is empty. Create a new node.
+
+         Node_Vectors.Append
+           (Container => Container.Nodes,
+            New_Item  => Node_Type'
+                           (Element  => New_Item,
+                            Parent   => Parent_Pos,
+                            Position => Direction (Container, Parent_Pos),
+                            Ways     => [others => No_Element],
+                            Free     => False));
+
+         New_Node :=
+           Cursor'(Node => Node_Vectors.Last_Index (Container.Nodes));
+      end if;
+
+      Container.Length := Container.Length + 1;
 
       --  Add the node at Position as a child of the new node
 
@@ -786,6 +866,43 @@ is
          Container.Root := New_Node;
       end if;
    end Insert_Parent;
+
+   ------------
+   -- Delete --
+   ------------
+
+   procedure Delete
+     (Container : in out Tree;
+      Position  :        Cursor)
+   is
+   begin
+      if not Has_Element (Container, Position) then
+         raise Constraint_Error with "Invalid cursor";
+      end if;
+
+      if Position = Root (Container) then
+         Container := Empty_Tree;
+      else
+         --  Remove the node from its parent
+
+         declare
+            Node_Acc   : constant not null access constant Node_Type :=
+                           Node_Vectors.Constant_Reference
+                             (Container.Nodes, Position.Node);
+
+            Parent_Acc : constant not null access Node_Type :=
+                           Node_Vectors.Reference
+                             (Container.Nodes'Access,
+                              Node_Acc.all.Parent.Node);
+         begin
+            Parent_Acc.all.Ways (Node_Acc.all.Position) := No_Element;
+         end;
+
+         --  Delete the node and its children
+
+         Add_To_Free_List_Recursive (Container, Position);
+      end if;
+   end Delete;
 
    --------------------
    -- Splice_Subtree --
@@ -870,5 +987,58 @@ is
                (Container.all.Nodes'Access, Position.Node)
                .all.Element'Access;
    end Reference;
+
+   --------------------------
+   -- Alloc_From_Free_List --
+   --------------------------
+
+   procedure Alloc_From_Free_List
+     (Container : in out Tree;
+      Node      :    out Cursor)
+   is
+   begin
+      Node := Container.Free_List;
+
+      if Node /= No_Element then
+         declare
+            Node_Acc : constant not null access Node_Type :=
+                         Node_Vectors.Reference
+                           (Container.Nodes'Access, Node.Node);
+         begin
+            Node_Acc.all.Free   := False;
+            Container.Free_List := Node_Acc.all.Ways (Way_Type'First);
+         end;
+      end if;
+   end Alloc_From_Free_List;
+
+   --------------------------------
+   -- Add_To_Free_List_Recursive --
+   --------------------------------
+
+   procedure Add_To_Free_List_Recursive
+     (Container : in out Tree;
+      Node      :        Cursor)
+   is
+      Node_Acc : constant not null access Node_Type :=
+                   Node_Vectors.Reference (Container.Nodes'Access, Node.Node);
+   begin
+      --  Delete all child nodes
+
+      for C of Node_Acc.all.Ways loop
+         if C /= No_Element then
+            Add_To_Free_List_Recursive (Container, C);
+         end if;
+      end loop;
+
+      --  Mark as free
+
+      Node_Acc.all.Free := True;
+
+      --  Add this node to the free list
+
+      Node_Acc.all.Ways (Way_Type'First) := Container.Free_List;
+      Container.Free_List                := Node;
+      Container.Length                   := Container.Length - 1;
+   end Add_To_Free_List_Recursive;
 
 end Stree.Unbounded_Multiway_Trees;
