@@ -15,3 +15,4 @@ project-files = ["stree.gpr"]
 
 [[depends-on]]
 gnatprove = "^14.1.1"
+gnat = "^14"
