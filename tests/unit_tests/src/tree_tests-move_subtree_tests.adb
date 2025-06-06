@@ -6,16 +6,16 @@
 with AUnit.Assertions; use AUnit.Assertions;
 with Support;
 
-package body Tree_Tests.Splice_Subtree_Tests is
+package body Tree_Tests.Move_Subtree_Tests is
    use Integer_3Way_Trees;
 
    package S is new Support (Integer_3Way_Trees);
 
-   -------------------------------------
-   -- Test_Splice_Subtree_Single_Node --
-   -------------------------------------
+   ---------------------------------
+   -- Test_Move_Subtree_Single_Node --
+   ---------------------------------
 
-   --  This test checks that Splice_Subtree correctly moves a subtree
+   --  This test checks that Move_Subtree correctly moves a subtree
    --  consisting of a single node.
    --
    --  The tree in this example is:
@@ -29,7 +29,7 @@ package body Tree_Tests.Splice_Subtree_Tests is
    --
    --  Node 5 is spliced to be the Middle child of node 4.
 
-   procedure Test_Splice_Subtree_Single_Node (T : in out Test_Fixture) is
+   procedure Test_Move_Subtree_Single_Node (T : in out Test_Fixture) is
       Nodes : S.Cursor_Map (1 .. 8);
 
       Container : Tree;
@@ -45,7 +45,7 @@ package body Tree_Tests.Splice_Subtree_Tests is
       S.Insert_Child (Container, 7, 6, Middle, Nodes);
       S.Insert_Child (Container, 8, 7, Right, Nodes);
 
-      Splice_Subtree
+      Move_Subtree
         (Container    => Container,
          Subtree_Root => Nodes (5),
          New_Parent   => Nodes (4),
@@ -90,13 +90,13 @@ package body Tree_Tests.Splice_Subtree_Tests is
                                8 => [Left   => No_Element,
                                      Middle => No_Element,
                                      Right  => No_Element]]);
-   end Test_Splice_Subtree_Single_Node;
+   end Test_Move_Subtree_Single_Node;
 
-   ----------------------------------------
-   -- Test_Splice_Subtree_Multiple_Nodes --
-   ----------------------------------------
+   --------------------------------------
+   -- Test_Move_Subtree_Multiple_Nodes --
+   --------------------------------------
 
-   --  This test checks that Splice_Subtree correctly moves a subtree
+   --  This test checks that Move_Subtree correctly moves a subtree
    --  consisting of multiple nodes.
    --
    --  The tree in this example is:
@@ -110,7 +110,7 @@ package body Tree_Tests.Splice_Subtree_Tests is
    --
    --  Node 2 is spliced to be the Middle child of node 7.
 
-   procedure Test_Splice_Subtree_Multiple_Nodes (T : in out Test_Fixture) is
+   procedure Test_Move_Subtree_Multiple_Nodes (T : in out Test_Fixture) is
       Nodes : S.Cursor_Map (1 .. 8);
 
       Container : Tree;
@@ -126,7 +126,7 @@ package body Tree_Tests.Splice_Subtree_Tests is
       S.Insert_Child (Container, 7, 6, Middle, Nodes);
       S.Insert_Child (Container, 8, 7, Right, Nodes);
 
-      Splice_Subtree
+      Move_Subtree
         (Container    => Container,
          Subtree_Root => Nodes (2),
          New_Parent   => Nodes (7),
@@ -171,16 +171,16 @@ package body Tree_Tests.Splice_Subtree_Tests is
                                8 => [Left   => No_Element,
                                      Middle => No_Element,
                                      Right  => No_Element]]);
-   end Test_Splice_Subtree_Multiple_Nodes;
+   end Test_Move_Subtree_Multiple_Nodes;
 
-   ------------------------------------------
-   -- Test_Splice_Subtree_Bad_Subtree_Root --
-   ------------------------------------------
+   ----------------------------------------
+   -- Test_Move_Subtree_Bad_Subtree_Root --
+   ----------------------------------------
 
-   --  Test that Splice_Subtree raises Constraint_Error when the Subtree_Root
+   --  Test that Move_Subtree raises Constraint_Error when the Subtree_Root
    --  parameter references an invalid node.
 
-   procedure Test_Splice_Subtree_Bad_Subtree_Root (T : in out Test_Fixture) is
+   procedure Test_Move_Subtree_Bad_Subtree_Root (T : in out Test_Fixture) is
       Container : Tree;
    begin
       Insert_Root (Container, 1);
@@ -190,7 +190,7 @@ package body Tree_Tests.Splice_Subtree_Tests is
 
       declare
       begin
-         Splice_Subtree
+         Move_Subtree
            (Container    => Container,
             Subtree_Root => Cursor'(Node => 123),
             New_Parent   => Child (Container, Root (Container), Left),
@@ -201,16 +201,16 @@ package body Tree_Tests.Splice_Subtree_Tests is
          when Constraint_Error =>
             null;
       end;
-   end Test_Splice_Subtree_Bad_Subtree_Root;
+   end Test_Move_Subtree_Bad_Subtree_Root;
 
-   ----------------------------------------
-   -- Test_Splice_Subtree_Bad_New_Parent --
-   ----------------------------------------
+   --------------------------------------
+   -- Test_Move_Subtree_Bad_New_Parent --
+   --------------------------------------
 
-   --  Test that Splice_Subtree raises Constraint_Error when the New_Parent
+   --  Test that Move_Subtree raises Constraint_Error when the New_Parent
    --  parameter references an invalid node.
 
-   procedure Test_Splice_Subtree_Bad_New_Parent (T : in out Test_Fixture) is
+   procedure Test_Move_Subtree_Bad_New_Parent (T : in out Test_Fixture) is
       Container : Tree;
    begin
       Insert_Root (Container, 1);
@@ -220,7 +220,7 @@ package body Tree_Tests.Splice_Subtree_Tests is
 
       declare
       begin
-         Splice_Subtree
+         Move_Subtree
            (Container    => Container,
             Subtree_Root => Child (Container, Root (Container), Left),
             New_Parent   => Cursor'(Node => 123),
@@ -231,13 +231,13 @@ package body Tree_Tests.Splice_Subtree_Tests is
          when Constraint_Error =>
             null;
       end;
-   end Test_Splice_Subtree_Bad_New_Parent;
+   end Test_Move_Subtree_Bad_New_Parent;
 
-   -------------------------------------
-   -- Test_Splice_Subtree_Cyclic_Tree --
-   -------------------------------------
+   -----------------------------------
+   -- Test_Move_Subtree_Cyclic_Tree --
+   -----------------------------------
 
-   --  Test that Splice_Subtree raises Constraint_Error when the the New_Parent
+   --  Test that Move_Subtree raises Constraint_Error when the the New_Parent
    --  is equal to Subtree_Root.
    --
    --  The tree in this example is:
@@ -251,7 +251,7 @@ package body Tree_Tests.Splice_Subtree_Tests is
    --
    --  An attempt is made to splice node 6 to be a child of node 8
 
-   procedure Test_Splice_Subtree_Cyclic_Tree (T : in out Test_Fixture) is
+   procedure Test_Move_Subtree_Cyclic_Tree (T : in out Test_Fixture) is
       Nodes : S.Cursor_Map (1 .. 8);
 
       Container : Tree;
@@ -269,7 +269,7 @@ package body Tree_Tests.Splice_Subtree_Tests is
 
       declare
       begin
-         Splice_Subtree
+         Move_Subtree
            (Container    => Container,
             Subtree_Root => Nodes (6),
             New_Parent   => Nodes (8),
@@ -280,24 +280,24 @@ package body Tree_Tests.Splice_Subtree_Tests is
          when Constraint_Error =>
             null;
       end;
-   end Test_Splice_Subtree_Cyclic_Tree;
+   end Test_Move_Subtree_Cyclic_Tree;
 
-   ------------------
+   ----------------
    -- Add_To_Suite --
-   ------------------
+   ----------------
 
    procedure Add_To_Suite (S : in out Test_Suite'Class) is
    begin
-      S.Add_Test (Caller.Create ("Splice_Subtree (Single node)",
-                                 Test_Splice_Subtree_Single_Node'Access));
-      S.Add_Test (Caller.Create ("Splice_Subtree (Multiple nodes)",
-                                 Test_Splice_Subtree_Multiple_Nodes'Access));
-      S.Add_Test (Caller.Create ("Splice_Subtree (Invalid Subtree_Root)",
-                                 Test_Splice_Subtree_Bad_Subtree_Root'Access));
-      S.Add_Test (Caller.Create ("Splice_Subtree (Invalid New_Parent)",
-                                 Test_Splice_Subtree_Bad_New_Parent'Access));
-      S.Add_Test (Caller.Create ("Splice_Subtree (Cycle)",
-                                 Test_Splice_Subtree_Cyclic_Tree'Access));
+      S.Add_Test (Caller.Create ("Move_Subtree (Single node)",
+                                 Test_Move_Subtree_Single_Node'Access));
+      S.Add_Test (Caller.Create ("Move_Subtree (Multiple nodes)",
+                                 Test_Move_Subtree_Multiple_Nodes'Access));
+      S.Add_Test (Caller.Create ("Move_Subtree (Invalid Subtree_Root)",
+                                 Test_Move_Subtree_Bad_Subtree_Root'Access));
+      S.Add_Test (Caller.Create ("Move_Subtree (Invalid New_Parent)",
+                                 Test_Move_Subtree_Bad_New_Parent'Access));
+      S.Add_Test (Caller.Create ("Move_Subtree (Cycle)",
+                                 Test_Move_Subtree_Cyclic_Tree'Access));
    end Add_To_Suite;
 
-end Tree_Tests.Splice_Subtree_Tests;
+end Tree_Tests.Move_Subtree_Tests;

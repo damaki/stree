@@ -904,11 +904,11 @@ is
       end if;
    end Delete;
 
-   --------------------
-   -- Splice_Subtree --
-   --------------------
+   ------------------
+   -- Move_Subtree --
+   ------------------
 
-   procedure Splice_Subtree
+   procedure Move_Subtree
      (Container    : in out Tree;
       Subtree_Root :        Cursor;
       New_Parent   :        Cursor;
@@ -956,7 +956,7 @@ is
          ST_Node_Acc.all.Parent   := New_Parent;
          ST_Node_Acc.all.Position := Way;
       end;
-   end Splice_Subtree;
+   end Move_Subtree;
 
    ------------------------
    -- Constant_Reference --

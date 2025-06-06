@@ -998,7 +998,7 @@ is
    --
    --  If the node has any child nodes then they are also deleted.
 
-   procedure Splice_Subtree
+   procedure Move_Subtree
      (Container    : in out Tree;
       Subtree_Root :        Cursor;
       New_Parent   :        Cursor;
@@ -1079,9 +1079,11 @@ is
                    Parent (Model (Container'Old), Subtree_Root),
                    Direction (Model (Container'Old), Subtree_Root))
             = No_Element);
-   --  Insert a new item as a parent of the node at the specified Position.
+   --  Move a subtree rooted by the element at Position to another node in the
+   --  tree.
    --
-   --  For example, splicing node C (Subtree_Root) to node B (New_Parent):
+   --  For example, moving the subtree rooted at node C to be a child of
+   --  node B:
    --         A              A
    --        / \            /
    --       B   C    ===>  B
