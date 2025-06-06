@@ -1,0 +1,67 @@
+on:                    # Run the workflow for each of the following event:
+  push:                # - A branch is pushed or updated.
+    branches:
+      - main
+  pull_request:        # - A pull-request is opened or updated.
+  workflow_dispatch:   # - A manual run of the workflow is requested from the GitHub web interface.
+
+jobs:
+
+  check-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: alire-project/setup-alire@v4
+        with:
+          version: 2.1.0
+
+      # Use the validation build profile to enforce static analysis and coding style.
+      - name: Build
+        run: |
+          alr build --validation
+
+  unit-tests:
+    needs: check-build
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: alire-project/setup-alire@v4
+        with:
+          version: 2.1.0
+
+      - name: Build Tests
+        run: |
+          cd tests/unit_tests
+          alr build --validation
+          alr run -s
+
+  proof-tests:
+    needs: check-build
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: alire-project/setup-alire@v4
+        with:
+          version: 2.1.0
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install Test Dependencies
+        run: |
+          pip install -r tests/proof_tests/requirements.txt
+
+      - name: Proof Tests
+        run: |
+          cd tests/proof_tests
+          pytest -v --gnatprove-jobs=0
+
