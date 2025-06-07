@@ -82,9 +82,7 @@ is
         SPARK.Big_Integers.Signed_Conversions (Count_Type);
 
       function To_Cursor (I : Count_Type) return Cursor is
-        (Cursor'(Node => I))
-      with
-        Annotate => (GNATprove, Inline_For_Proof);
+        (Cursor'(Node => I));
 
       -----------
       -- Paths --
@@ -169,22 +167,18 @@ is
                         < To_Big_Integer (Integer (Valid_Cursor_Range'Last)));
 
       function Is_Empty (M : Model_Type) return Boolean is
-        (for all N of M => not N.In_Tree)
-      with
-        Annotate => (GNATprove, Inline_For_Proof);
+        (for all N of M => not N.In_Tree);
 
       function Parent (M : Model_Type; C : Cursor) return Cursor is
         (M (C.Node).Parent)
       with
-        Pre => C /= No_Element,
-        Annotate => (GNATprove, Inline_For_Proof);
+        Pre => C /= No_Element;
 
       function Path (M : Model_Type; C : Cursor) return Way_Sequences.Sequence
       is
         (M (C.Node).Path)
       with
-        Pre => C /= No_Element,
-        Annotate => (GNATprove, Inline_For_Proof);
+        Pre => C /= No_Element;
 
       function Has_Children
         (M : Model_Type;
@@ -192,22 +186,18 @@ is
          return Boolean
       is
         (C /= No_Element
-         and then (for some Ch of M (C.Node).Children => Ch /= No_Element))
-      with
-        Annotate => (GNATprove, Inline_For_Proof);
+         and then (for some Ch of M (C.Node).Children => Ch /= No_Element));
 
       function Child (M : Model_Type; C : Cursor; W : Way_Type) return Cursor
       is
         (M (C.Node).Children (W))
       with
-        Pre => C /= No_Element,
-        Annotate => (GNATprove, Inline_For_Proof);
+        Pre => C /= No_Element;
 
       function Children (M : Model_Type; C : Cursor) return Way_Cursor_Array is
         (M (C.Node).Children)
       with
-        Pre => C /= No_Element,
-        Annotate => (GNATprove, Inline_For_Proof);
+        Pre => C /= No_Element;
 
       function Has_Sibling
         (M : Model_Type;
@@ -227,26 +217,20 @@ is
       is
         (M (M (C.Node).Parent.Node).Children (W))
       with
-        Pre => Has_Element (M, C) and then not Is_Root (M, C),
-        Annotate => (GNATprove, Inline_For_Proof);
+        Pre => Has_Element (M, C) and then not Is_Root (M, C);
 
       function Has_Element (M : Model_Type; C : Cursor) return Boolean is
-        (C /= No_Element and then M (C.Node).In_Tree)
-      with
-        Annotate => (GNATprove, Inline_For_Proof);
+        (C /= No_Element and then M (C.Node).In_Tree);
 
       function Direction (M : Model_Type; C : Cursor) return Way_Type is
         (M (C.Node).Way)
       with
-        Pre => C /= No_Element,
-        Annotate => (GNATprove, Inline_For_Proof);
+        Pre => C /= No_Element;
 
       function Is_Root (M : Model_Type; C : Cursor) return Boolean is
         (C /= No_Element
          and then M (C.Node).In_Tree
-         and then M (C.Node).Parent = No_Element)
-      with
-        Annotate => (GNATprove, Inline_For_Proof);
+         and then M (C.Node).Parent = No_Element);
 
       function Is_Leaf (M : Model_Type; C : Cursor) return Boolean is
         (C /= No_Element
@@ -812,14 +796,17 @@ is
        --  the child at the specified Way.
        and then
          (for all W in Way_Type =>
-            (if Child (Model (Container'Old), Position, W) /= No_Element
-                or else W = Way
-             then Child (Model (Container'Old), Position, W) /= No_Element
-             else Child (Model (Container'Old), Position, W) = No_Element))
+            (if W /= Way then
+               Child (Model (Container), Position, W) =
+                 Child (Model (Container'Old), Position, W)))
 
        --  The child of Position at the specified Way is now a valid node
        and then Has_Element (Model (Container),
                              Child (Model (Container), Position, Way))
+
+       --  The new child is a leaf
+       and then Is_Leaf (Model (Container),
+                         Child (Model (Container), Position, Way))
 
        --  The new child has the specified element
        and then
