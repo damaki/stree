@@ -331,6 +331,32 @@ is
                          and then Model'Result (J).Path = Model'Result (I).Path
                       then J = I))))
 
+          --  Nodes in the tree with the same parent have different directions
+          and then
+            (for all I in Model'Result'Range =>
+               (for all J in Model'Result'Range =>
+                  (if Model'Result (I).In_Tree
+                      and then Model'Result (J).In_Tree
+                      and then Model'Result (I).Parent =
+                               Model'Result (J).Parent
+                      and then Model'Result (I).Way =
+                               Model'Result (J).Way
+                   then I = J)))
+
+           --  Nodes in the tree all have different child nodes
+          and then
+            (for all I in Model'Result'Range =>
+               (for all J in Model'Result'Range =>
+                  (for all IW in Way_Type =>
+                     (for all JW in Way_Type =>
+                        (if Model'Result (I).In_Tree
+                            and then Model'Result (J).In_Tree
+                            and then Model'Result (I).Children (IW) /=
+                                     No_Element
+                            and then Model'Result (I).Children (IW) =
+                                     Model'Result (J).Children (JW)
+                         then I = J and then IW = JW)))))
+
            --  There is exactly one root in the tree
            and then
              (for all I in Model'Result'Range =>
@@ -740,7 +766,7 @@ is
      Post   =>
        Length (Container) = 1
        and then Equivalent_Elements (New_Item, Root_Element (Container))
-       and then not Has_Children (Model (Container), Root (Container));
+       and then Is_Leaf (Model (Container), Root (Container));
 
    procedure Insert_Child
      (Container : in out Tree;
@@ -756,55 +782,44 @@ is
        --  The length of the container has incremented
        Length (Container) = Length (Container'Old) + 1
 
-       --  All previous nodes are still in the tree
+       --  The root of the tree has not changed.
+       and then Root (Container) = Root (Container'Old)
+
+       --  All nodes are unchanged, except for the node at Position and the
+       --  new child node.
+       and then
+         (for all I in Valid_Cursor_Range =>
+            (if To_Cursor (I) /= Position
+                and then To_Cursor (I) /= Child (Container, Position, Way)
+             then Model (Container) (I) = Model (Container'Old) (I)))
+
+       --  The new child is a node that did not exist previously
        and then
          (for all I in Valid_Cursor_Range =>
             (if Has_Element (Model (Container'Old), To_Cursor (I)) then
-                Has_Element (Model (Container),     To_Cursor (I))))
+               To_Cursor (I) /= Child (Model (Container), Position, Way)))
 
-       --  The paths to all previous nodes is unchanged
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
-               Path (Model (Container), To_Cursor (I)) =
-                 Path (Model (Container'Old), To_Cursor (I))))
+       --  The node at position has not changed, except for the addition of a
+       --  new child.
+       and then Has_Element (Model (Container), Position)
+       and then Path (Model (Container), Position) =
+                Path (Model (Container'Old), Position)
+       and then Parent (Model (Container), Position) =
+                Parent (Model (Container'Old), Position)
+       and then Direction (Model (Container), Position) =
+                Direction (Model (Container'Old), Position)
 
-       --  The parents of all previous nodes are unchanged
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
-               Parent (Model (Container), To_Cursor (I)) =
-                 Parent (Model (Container'Old), To_Cursor (I))))
-
-       --  The direction to each node from its parent is unchanged
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
-               Direction (Model (Container), To_Cursor (I)) =
-                 Direction (Model (Container'Old), To_Cursor (I))))
-
-       --  The children of all nodes is unchanged, except for the node
-       --  at the specified Position.
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
-               (if To_Cursor (I) /= Position then
-                  Children (Model (Container), To_Cursor (I)) =
-                    Children (Model (Container'Old), To_Cursor (I)))))
-
-       --  The children of the node at Position are unchanged, except for
-       --  the child at the specified Way.
-       and then
-         (for all W in Way_Type =>
-            (if W /= Way then
-               Child (Model (Container), Position, W) =
-                 Child (Model (Container'Old), Position, W)))
-
-       --  The child of Position at the specified Way is now a valid node
+       --  A child has been inserted at the specified Way in node Position
        and then Has_Element (Model (Container),
-                             Child (Model (Container), Position, Way))
+                             Child (Container, Position, Way))
 
-       --  The new child is a leaf
+       --  All other children of the node at Position are unchanged
+       and then (for all W in Way_Type =>
+                   (if W /= Way then
+                      Child (Model (Container), Position, W) =
+                        Child (Model (Container'Old), Position, W)))
+
+       --  The new child is a leaf node
        and then Is_Leaf (Model (Container),
                          Child (Model (Container), Position, Way))
 
@@ -820,10 +835,7 @@ is
             (if Has_Element (Model (Container'Old), To_Cursor (I)) then
                Equivalent_Elements
                  (Element (Container,     To_Cursor (I)),
-                  Element (Container'Old, To_Cursor (I)))))
-
-       --  The root of the tree has not changed.
-       and then Root (Container) = Root (Container'Old);
+                  Element (Container'Old, To_Cursor (I)))));
 
    procedure Insert_Parent
      (Container : in out Tree;
