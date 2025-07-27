@@ -257,6 +257,17 @@ is
          and then Has_Element (M, Position)
          and then Path (M, Subtree_Root) <= Path (M, Position));
 
+      function In_Branch
+        (M            : Model_Type;
+         Subtree_Root : Cursor;
+         Position     : Cursor;
+         Way          : Way_Type)
+         return Boolean
+      is
+        (Has_Element (M, Subtree_Root)
+         and then Has_Element (M, Position)
+         and then Add (Path (M, Subtree_Root), Way) <= Path (M, Position));
+
       function Depth (M : Model_Type; C : Cursor) return Count_Type is
         (Count_Type (To_Integer (Length (Path (M, C)))))
       with
@@ -343,7 +354,7 @@ is
                                Model'Result (J).Way
                    then I = J)))
 
-           --  Nodes in the tree all have different child nodes
+          --  Nodes in the tree all have different child nodes
           and then
             (for all I in Model'Result'Range =>
                (for all J in Model'Result'Range =>
@@ -742,6 +753,30 @@ is
      Post   =>
        Is_Ancestor'Result = Is_Ancestor (Model (Container), Ancestor, Child);
    --  Query if Ancestor is an ancestor node of Child.
+
+   function In_Subtree
+     (Container    : Tree;
+      Subtree_Root : Cursor;
+      Position     : Cursor)
+      return Boolean
+   with
+     Global => null,
+     Post   => In_Subtree'Result =
+                 In_Subtree (Model (Container), Subtree_Root, Position);
+   --  Query if the node at Position is in the subtree rooted by Subtree_Root.
+
+   function In_Branch
+     (Container    : Tree;
+      Ancestor     : Cursor;
+      Position     : Cursor;
+      Way          : Way_Type)
+      return Boolean
+   with
+     Global => null,
+     Post   => In_Branch'Result =
+                 In_Branch (Model (Container), Ancestor, Position, Way);
+   --  Query if the node at Position is a descendant of the specified branch
+   --  of the node at Ancestor.
 
    function Depth
      (Container : Tree;

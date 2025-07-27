@@ -685,6 +685,45 @@ is
       return Node /= No_Element;
    end Is_Ancestor;
 
+   ----------------
+   -- In_Subtree --
+   ----------------
+
+   function In_Subtree
+     (Container    : Tree;
+      Subtree_Root : Cursor;
+      Position     : Cursor)
+      return Boolean
+   is
+     (Has_Element (Container, Subtree_Root)
+      and then Has_Element (Container, Position)
+      and then (Position = Subtree_Root
+                or else Is_Ancestor (Container, Subtree_Root, Position)));
+
+   ---------------
+   -- In_Branch --
+   ---------------
+
+   function In_Branch
+     (Container    : Tree;
+      Ancestor     : Cursor;
+      Position     : Cursor;
+      Way          : Way_Type)
+      return Boolean
+   is
+      C : Cursor;
+   begin
+      if not Has_Element (Container, Ancestor)
+         or else not Has_Element (Container, Position)
+      then
+         return False;
+      end if;
+
+      C := Child (Container, Ancestor, Way);
+
+      return Position = C or else Is_Ancestor (Container, C, Position);
+   end In_Branch;
+
    -----------
    -- Depth --
    -----------
