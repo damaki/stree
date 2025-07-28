@@ -232,6 +232,12 @@ is
          and then M (C.Node).In_Tree
          and then M (C.Node).Parent = No_Element);
 
+      function Root (M : Model_Type) return Cursor with
+        Global => null,
+        Post   => (if Is_Empty (M)
+                   then Root'Result = No_Element
+                   else Is_Root (M, Root'Result));
+
       function Is_Leaf (M : Model_Type; C : Cursor) return Boolean is
         (C /= No_Element
          and then M (C.Node).In_Tree

@@ -27,10 +27,33 @@ is
       Node      :        Cursor);
    --  Add a node (and its children) to the free list
 
+   ------------------
+   -- Formal_Model --
+   ------------------
+
    package body Formal_Model is
 
       package Cursor_Sets is new SPARK.Containers.Functional.Sets
         (Element_Type => Cursor);
+
+      ----------
+      -- Root --
+      ----------
+
+      function Root (M : Model_Type) return Cursor is
+      begin
+         for I in Model_Type'Range loop
+            if M (I).In_Tree and then M (I).Parent = No_Element then
+               return To_Cursor (I);
+            end if;
+         end loop;
+
+         return No_Element;
+      end Root;
+
+      -----------
+      -- Model --
+      -----------
 
       function Model (Container : Tree) return Model_Type is
          use Node_Vectors;
