@@ -39,10 +39,12 @@ package body Tree_Tests.Is_Empty_Tests is
 
    procedure Add_To_Suite (S : in out Test_Suite'Class) is
    begin
-      S.Add_Test (Caller.Create ("Is_Empty (empty tree)",
-                                 Test_Is_Empty_Empty'Access));
-      S.Add_Test (Caller.Create ("Is_Empty (not empty tree)",
-                                 Test_Is_Empty_Not_Empty'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Is_Empty (empty tree)",
+                     Test_Is_Empty_Empty'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Is_Empty (not empty tree)",
+                     Test_Is_Empty_Not_Empty'Access));
    end Add_To_Suite;
 
 end Tree_Tests.Is_Empty_Tests;

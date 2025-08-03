@@ -118,14 +118,18 @@ package body Tree_Tests.Element_Tests is
 
    procedure Add_To_Suite (S : in out Test_Suite'Class) is
    begin
-      S.Add_Test (Caller.Create ("Element (1 node tree)",
-                                 Test_Element_1'Access));
-      S.Add_Test (Caller.Create ("Element (5 node tree)",
-                                 Test_Element_5'Access));
-      S.Add_Test (Caller.Create ("Element (Invalid cursor)",
-                                 Test_Element_Invalid_Cursor'Access));
-      S.Add_Test (Caller.Create ("Element (No_Element cursor)",
-                                 Test_Element_No_Element'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Element (1 node tree)",
+                     Test_Element_1'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Element (5 node tree)",
+                     Test_Element_5'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Element (Invalid cursor)",
+                     Test_Element_Invalid_Cursor'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Element (No_Element cursor)",
+                     Test_Element_No_Element'Access));
    end Add_To_Suite;
 
 end Tree_Tests.Element_Tests;

@@ -55,11 +55,11 @@ package body Tree_Tests.Length_Tests is
 
    procedure Add_To_Suite (S : in out Test_Suite'Class) is
    begin
-      S.Add_Test (Caller.Create ("Length (0 nodes)",
+      S.Add_Test (Caller.Create ("Unbounded_Multiway_Trees.Length (0 nodes)",
                                  Test_Length_0'Access));
-      S.Add_Test (Caller.Create ("Length (1 node)",
+      S.Add_Test (Caller.Create ("Unbounded_Multiway_Trees.Length (1 node)",
                                  Test_Length_1'Access));
-      S.Add_Test (Caller.Create ("Length (2 nodes)",
+      S.Add_Test (Caller.Create ("Unbounded_Multiway_Trees.Length (2 nodes)",
                                  Test_Length_2'Access));
    end Add_To_Suite;
 

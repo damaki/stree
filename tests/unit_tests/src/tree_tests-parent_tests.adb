@@ -87,14 +87,18 @@ package body Tree_Tests.Parent_Tests is
 
    procedure Add_To_Suite (S : in out Test_Suite'Class) is
    begin
-      S.Add_Test (Caller.Create ("Parent (No_Element)",
-                                 Test_Parent_No_Element'Access));
-      S.Add_Test (Caller.Create ("Parent (Root)",
-                                 Test_Parent_Root'Access));
-      S.Add_Test (Caller.Create ("Parent (Child)",
-                                 Test_Parent_Child'Access));
-      S.Add_Test (Caller.Create ("Parent (Grandchild)",
-                                 Test_Parent_Grandchild'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Parent (No_Element)",
+                     Test_Parent_No_Element'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Parent (Root)",
+                     Test_Parent_Root'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Parent (Child)",
+                     Test_Parent_Child'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Parent (Grandchild)",
+                     Test_Parent_Grandchild'Access));
    end Add_To_Suite;
 
 end Tree_Tests.Parent_Tests;

@@ -14,6 +14,9 @@ executables = ["run_unit_tests"]
 [build-switches]
 "*".Ada_Version = "Ada2022"
 
+[[gpr-set-externals]]
+SPARKLIB_BODY_MODE = "On"
+
 [[depends-on]]
 stree = "*"
 aunit = "^23.0.0"

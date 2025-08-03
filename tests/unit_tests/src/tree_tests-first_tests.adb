@@ -42,9 +42,9 @@ package body Tree_Tests.First_Tests is
 
    procedure Add_To_Suite (S : in out Test_Suite'Class) is
    begin
-      S.Add_Test (Caller.Create ("First (Empty)",
+      S.Add_Test (Caller.Create ("Unbounded_Multiway_Trees.First (Empty)",
                                  Test_First_Empty'Access));
-      S.Add_Test (Caller.Create ("First (Not empty)",
+      S.Add_Test (Caller.Create ("Unbounded_Multiway_Trees.First (Not empty)",
                                  Test_First_Not_Empty'Access));
    end Add_To_Suite;
 

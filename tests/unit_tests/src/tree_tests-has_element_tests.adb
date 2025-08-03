@@ -78,14 +78,18 @@ package body Tree_Tests.Has_Element_Tests is
 
    procedure Add_To_Suite (S : in out Test_Suite'Class) is
    begin
-      S.Add_Test (Caller.Create ("Has_Element (No_Element)",
-                                 Test_Has_Element_No_Element'Access));
-      S.Add_Test (Caller.Create ("Has_Element (Empty Tree)",
-                                 Test_Has_Element_Empty'Access));
-      S.Add_Test (Caller.Create ("Has_Element (Invalid cursor)",
-                                 Test_Has_Element_Invalid_Cursor'Access));
-      S.Add_Test (Caller.Create ("Has_Element (Valid cursor)",
-                                 Test_Has_Element_Valid_Cursor'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Has_Element (No_Element)",
+                     Test_Has_Element_No_Element'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Has_Element (Empty Tree)",
+                     Test_Has_Element_Empty'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Has_Element (Invalid cursor)",
+                     Test_Has_Element_Invalid_Cursor'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Has_Element (Valid cursor)",
+                     Test_Has_Element_Valid_Cursor'Access));
    end Add_To_Suite;
 
 end Tree_Tests.Has_Element_Tests;
