@@ -4,7 +4,6 @@
 --  SPDX-License-Identifier: Apache-2.0
 --
 with Ada.Unchecked_Deallocation;
-with System.Atomic_Operations.Integer_Arithmetic;
 
 with SPARK.Containers;
 
@@ -31,10 +30,6 @@ is
      Ada.Unchecked_Deallocation
        (Object => Refcounted_Tree,
         Name   => Refcounted_Tree_Access);
-
-   package Refcount_Atomic_Arithmetic is new
-     System.Atomic_Operations.Integer_Arithmetic (Reference_Count);
-   use Refcount_Atomic_Arithmetic;
 
    ----------
    -- "<=" --
@@ -305,7 +300,7 @@ is
    procedure Adjust (C_E : in out Controlled_Element_Access) is
    begin
       if C_E.Ref /= null then
-         Atomic_Add (C_E.Ref.all.Refcount, 1);
+         C_E.Ref.all.Refcount := @ + 1;
       end if;
    end Adjust;
 
@@ -313,7 +308,7 @@ is
    procedure Adjust (C_T : in out Controlled_Tree_Access) is
    begin
       if C_T.Ref /= null then
-         Atomic_Add (C_T.Ref.all.Refcount, 1);
+         C_T.Ref.all.Refcount := @ + 1;
       end if;
    end Adjust;
 
@@ -357,7 +352,6 @@ is
    ------------------------------
    -- Copy_Tree_Except_Subtree --
    ------------------------------
-
 
    function Copy_Tree_Except_Subtree
      (Root    : Not_Null_Node_Access;
@@ -708,13 +702,11 @@ is
 
    overriding
    procedure Finalize (C_E : in out Controlled_Element_Access) is
-      Refcount  : Reference_Count;
-
    begin
       if C_E.Ref /= null then
-         Refcount := Atomic_Fetch_And_Subtract (C_E.Ref.all.Refcount, 1);
+         C_E.Ref.all.Refcount := @ - 1;
 
-         if Refcount = 1 then
+         if C_E.Ref.all.Refcount = 0 then
             Unchecked_Free_Element (C_E.Ref.all.Element);
             Unchecked_Free_Element_Ref (C_E.Ref);
          end if;
@@ -725,15 +717,14 @@ is
 
    overriding
    procedure Finalize (C_T : in out Controlled_Tree_Access) is
-      Refcount  : Reference_Count;
       Node      : Node_Access;
       Next      : Node_Access;
 
    begin
       if C_T.Ref /= null then
-         Refcount := Atomic_Fetch_And_Subtract (C_T.Ref.all.Refcount, 1);
+         C_T.Ref.all.Refcount := @ - 1;
 
-         if Refcount = 1 then
+         if C_T.Ref.all.Refcount = 0 then
 
             --  Iterate through the tree and free each node. Note that the
             --  iteration is performed depth-first, so child nodes will always
@@ -1039,6 +1030,37 @@ is
      (Container : Tree;
       P1, P2    : Path_Type)
    is null;
+
+   -----------------------------------------------
+   -- Lemma_Path_Length_Within_Container_Length --
+   -----------------------------------------------
+
+   procedure Lemma_Path_Length_Within_Container_Length
+     (Container : Tree;
+      Node      : Path_Type)
+   is null;
+
+   ------------
+   -- Length --
+   ------------
+
+   function Length (Container : Tree) return SPARK.Big_Integers.Big_Natural is
+      Node   : Node_Access;
+      Result : SPARK.Big_Integers.Big_Natural := 0;
+   begin
+      if Container.Ref.Ref = null then
+         return 0;
+      end if;
+
+      Node := First_Node (Container.Ref.Ref.all.Root_Node);
+
+      while Node /= null loop
+         Result := Result + 1;
+         Node   := Next_Node (Node);
+      end loop;
+
+      return Result;
+   end Length;
 
    ---------------
    -- Next_Node --

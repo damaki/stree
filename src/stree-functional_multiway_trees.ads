@@ -79,12 +79,12 @@ is
    Root_Node : constant Path_Type := Way_Sequences.Empty_Sequence;
 
    function Is_Root (Path : Path_Type) return Boolean is
-     (Way_Sequences.Length (Path) = 0);
+     (Length (Path) = 0);
    --  Returns True if the given path references the root node
 
    function Parent (Path : Path_Type) return Path_Type is
    --  Get the path that references the immediate ancestor of Path
-     (Way_Sequences.Remove (Path, Way_Sequences.Length (Path)))
+     (Remove (Path, Length (Path)))
    with
      Pre  => not Is_Root (Path),
      Post => Parent'Result < Path
@@ -93,25 +93,49 @@ is
    function Child (Path : Path_Type; Way : Way_Type) return Path_Type is
    --  Get the path that references the immediate descendant of Path in the
    --  specified direction.
-     (Way_Sequences.Add (Path, Way))
+     (Add (Path, Way))
    with
-     Post => Path < Child'Result;
+     Post => Path < Child'Result
+             and then Length (Child'Result) = Length (Path) + 1;
+
+   function Sibling (Path : Path_Type; Way : Way_Type) return Path_Type is
+     (Child (Parent (Path), Way))
+   with
+     Pre  => Length (Path) > 0,
+     Post => Parent (Sibling'Result) = Parent (Path);
+
+   function Way_From_Parent (Path : Path_Type) return Way_Type is
+     (Get (Path, Length (Path)))
+   with
+     Pre => Length (Path) > 0;
 
    function Is_Ancestor (Left, Right : Path_Type) return Boolean is
    --  Returns True if Left is an ancestor node of Right
-     (Left < Right);
+     (Left < Right)
+   with
+     Annotate => (GNATprove, Inline_For_Proof);
 
    function In_Subtree (Left, Right : Path_Type) return Boolean is
    --  Returns True if Left is in the subtree rooted by Right
-     (Right <= Left);
+     (Right <= Left)
+   with
+     Annotate => (GNATprove, Inline_For_Proof);
 
    function Concat (Left, Right : Path_Type) return Path_Type with
    --  Concatenate two paths together
      Global => null,
      Post   =>
-       Range_Equal (Left, Concat'Result, 1, Length (Left))
+       Range_Equal
+         (Left  => Left,
+          Right => Concat'Result,
+          Fst   => 1,
+          Lst   => Length (Left))
        and then Range_Shifted
-                  (Right, Concat'Result, 1, Length (Right), Length (Left));
+                  (Left   => Right,
+                   Right  => Concat'Result,
+                   Fst    => 1,
+                   Lst    => Length (Right),
+                   Offset => Length (Left));
 
    function Remove_Front
      (Path  : Path_Type;
@@ -124,7 +148,8 @@ is
      Global => null,
      Pre    => Count <= Length (Path),
      Post   =>
-       Length (Remove_Front'Result) = Length (Path) - Count
+       Length (Remove_Front'Result) =
+         Length (Path) - Count
        and then Range_Shifted
                   (Left   => Remove_Front'Result,
                    Right  => Path,
@@ -144,10 +169,11 @@ is
      Global => null,
      Pre    => Left_Subtree <= Left,
      Post   =>
-       Range_Equal (Left  => Splice_Path'Result,
-                    Right => Right_Subtree,
-                    Fst   => 1,
-                    Lst   => Length (Right_Subtree))
+       Range_Equal
+         (Left  => Splice_Path'Result,
+          Right => Right_Subtree,
+          Fst   => 1,
+          Lst   => Length (Right_Subtree))
        and then Range_Shifted
                   (Left   => Splice_Path'Result,
                    Right  => Left,
@@ -197,6 +223,10 @@ is
    function Get (Container : Tree; Path : Path_Type) return Element_Type with
      Global => null,
      Pre    => Contains (Container, Path);
+
+   function Length (Container : Tree) return SPARK.Big_Integers.Big_Natural
+   with
+     Global => null;
 
    procedure Lemma_Contains_Root (Container : Tree) with
    --  A non-empty tree always contains at least the root node
@@ -271,6 +301,19 @@ is
                  and then Contains (Container, P1)
                  and then Is_Leaf (Container, P1),
      Post     => not Contains (Container, P2);
+
+   procedure Lemma_Path_Length_Within_Container_Length
+     (Container : Tree;
+      Node      : Path_Type)
+   --  The path to all nodes in the tree is always less than the Length of the
+   --  tree.
+
+   with
+     Ghost,
+     Global   => null,
+     Annotate => (GNATprove, Automatic_Instantiation),
+     Pre      => Contains (Container, Node),
+     Post     => Way_Sequences.Length (Node) < Length (Container);
 
    ------------------------
    -- Property Functions --
@@ -357,7 +400,8 @@ is
    pragma Warnings (Off, "unused variable ""Node""");
    function Is_Empty (Container : Tree) return Boolean with
      Global => null,
-     Post   => Is_Empty'Result = (for all Node of Container => False);
+     Post   => Is_Empty'Result = (for all Node of Container => False)
+               and then (Is_Empty'Result = (Length (Container) = 0));
    pragma Warnings (On, "unused variable ""Node""");
    --  Returns True if Container contains no nodes
 
@@ -371,7 +415,8 @@ is
      Pre    => Contains (Container, Path),
      Post   => Is_Leaf'Result =
                  (for all Way in Way_Type =>
-                    not Contains (Container, Child (Path, Way)));
+                    not Contains (Container, Child (Path, Way))),
+     Annotate => (GNATprove, Inline_For_Proof);
 
    ----------------------------
    -- Construction Functions --
@@ -399,7 +444,8 @@ is
                and then (if not Is_Root (New_Node) then
                            Contains (Container, Parent (New_Node))),
      Post   =>
-       Contains (Add'Result, New_Node)
+       Length (Add'Result) = Length (Container) + 1
+       and then Contains (Add'Result, New_Node)
        and then Element_Logic_Equal (Get (Add'Result, New_Node),
                                      Copy_Element (New_Item))
        and then Elements_Equal (Container, Add'Result)
@@ -419,20 +465,21 @@ is
      Global => null,
      Pre    => Contains (Container, Node),
      Post   =>
-      Contains (Add_Parent'Result, Node)
-      and then Element_Logic_Equal (New_Item, Get (Add_Parent'Result, Node))
-      and then Elements_Equal_In_Subtrees
-                 (Left          => Container,
-                  Left_Subtree  => Node,
-                  Right         => Add_Parent'Result,
-                  Right_Subtree => Child (Node, Way))
-      and then Elements_Equal_In_Subtrees
-                 (Left          => Add_Parent'Result,
-                  Left_Subtree  => Child (Node, Way),
-                  Right         => Container,
-                  Right_Subtree => Node)
-      and then Elements_Equal_Except_Subtree
-                 (Add_Parent'Result, Container, Node);
+       Length (Add_Parent'Result) = Length (Container) + 1
+       and then Contains (Add_Parent'Result, Node)
+       and then Element_Logic_Equal (New_Item, Get (Add_Parent'Result, Node))
+       and then Elements_Equal_In_Subtrees
+                  (Left          => Container,
+                   Left_Subtree  => Node,
+                   Right         => Add_Parent'Result,
+                   Right_Subtree => Child (Node, Way))
+       and then Elements_Equal_In_Subtrees
+                  (Left          => Add_Parent'Result,
+                   Left_Subtree  => Child (Node, Way),
+                   Right         => Container,
+                   Right_Subtree => Node)
+       and then Elements_Equal_Except_Subtree
+                  (Add_Parent'Result, Container, Node);
 
    function Remove (Container : Tree; Node : Path_Type) return Tree
    --  Return a new container without the specified node or its descendants
@@ -440,7 +487,10 @@ is
    with
      Global => null,
      Post   =>
-       not Contains (Remove'Result, Node)
+       Length (Remove'Result) < Length (Container)
+       and then (if Is_Leaf (Container, Node) then
+                   Length (Remove'Result) = Length (Container) - 1)
+       and then not Contains (Remove'Result, Node)
        and then Elements_Equal (Remove'Result, Container)
        and then Nodes_Included_Except_Subtree (Container, Remove'Result, Node);
 
@@ -455,7 +505,9 @@ is
      Global => null,
      Pre    => Contains (Container, Node),
      Post   =>
-       Element_Logic_Equal (Get (Set'Result, Node), Copy_Element (New_Item))
+       Length (Set'Result) = Length (Container)
+       and then Element_Logic_Equal (Get (Set'Result, Node),
+                                     Copy_Element (New_Item))
        and then Same_Nodes (Container, Set'Result)
        and then Elements_Equal_Except (Container, Set'Result, Node);
 
@@ -611,8 +663,6 @@ private
 
    pragma SPARK_Mode (Off);
 
-   type Reference_Count is new Natural with Atomic;
-
    --------------
    -- Elements --
    --------------
@@ -620,8 +670,8 @@ private
    type Element_Access is access Element_Type;
 
    type Refcounted_Element is record
-      Refcount : aliased Reference_Count := 0;
-      Element   : Element_Access         := null;
+      Refcount : Natural        := 0;
+      Element  : Element_Access := null;
    end record;
 
    type Refcounted_Element_Access is access Refcounted_Element;
@@ -662,8 +712,8 @@ private
    -----------
 
    type Refcounted_Tree is record
-      Refcount  : aliased Reference_Count := 0;
-      Root_Node : Node_Access             := null;
+      Refcount  : Natural     := 0;
+      Root_Node : Node_Access := null;
    end record;
 
    type Refcounted_Tree_Access is access Refcounted_Tree;
