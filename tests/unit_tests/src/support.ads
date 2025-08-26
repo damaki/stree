@@ -7,7 +7,7 @@ with Stree.Unbounded_Multiway_Trees;
 
 generic
    with package Trees is new Stree.Unbounded_Multiway_Trees
-     (Element_Type => Integer, Way_Type => <>);
+     (Element_Type => Integer, others => <>);
 package Support is
 
    type Cursor_Map is array (Integer range <>) of Trees.Cursor;

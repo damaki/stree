@@ -8,6 +8,16 @@ with AUnit.Assertions; use AUnit.Assertions;
 package body Functional_Tree_Tests.Add_Parent_Tests is
    use Integer_3Way_Trees;
 
+   N_Left               : constant Path_Type := Child (Root, Left);
+   N_Middle             : constant Path_Type := Child (Root, Middle);
+   N_Right              : constant Path_Type := Child (Root, Right);
+   N_Left_Left          : constant Path_Type := Child (N_Left, Left);
+   N_Left_Middle        : constant Path_Type := Child (N_Left, Middle);
+   N_Left_Middle_Left   : constant Path_Type := Child (N_Left_Middle, Left);
+   N_Left_Middle_Middle : constant Path_Type := Child (N_Left_Middle, Middle);
+   N_Right_Middle       : constant Path_Type := Child (N_Right, Middle);
+   N_Right_Middle_Right : constant Path_Type := Child (N_Right_Middle, Right);
+
    --------------------------
    -- Test_Add_Parent_Root --
    --------------------------
@@ -19,11 +29,11 @@ package body Functional_Tree_Tests.Add_Parent_Tests is
       Container : Tree := Empty_Tree;
 
    begin
-      Container := Add (Container, 1, []);
-      Container := Add_Parent (Container, 2, [], Middle);
+      Container := Add (Container, 1, Root);
+      Container := Add_Parent (Container, 2, Root, Middle);
 
-      Assert (Get (Container, []) = 2, "root node is not 2");
-      Assert (Get (Container, [Middle]) = 1, "middle node is not 1");
+      Assert (Get (Container, Root) = 2, "root node is not 2");
+      Assert (Get (Container, N_Middle) = 1, "middle node is not 1");
    end Test_Add_Parent_Root;
 
    ------------------------------
@@ -49,26 +59,26 @@ package body Functional_Tree_Tests.Add_Parent_Tests is
       Container : Tree := Empty_Tree;
 
    begin
-      Container := Add (Container, 1, []);
-      Container := Add (Container, 2, [Left]);
-      Container := Add (Container, 3, [Left, Left]);
-      Container := Add (Container, 4, [Left, Middle]);
-      Container := Add (Container, 5, [Middle]);
-      Container := Add (Container, 6, [Right]);
-      Container := Add (Container, 7, [Right, Middle]);
-      Container := Add (Container, 8, [Right, Middle, Right]);
+      Container := Add (Container, 1, Root);
+      Container := Add (Container, 2, N_Left);
+      Container := Add (Container, 3, N_Left_Left);
+      Container := Add (Container, 4, N_Left_Middle);
+      Container := Add (Container, 5, N_Middle);
+      Container := Add (Container, 6, N_Right);
+      Container := Add (Container, 7, N_Right_Middle);
+      Container := Add (Container, 8, N_Right_Middle_Right);
 
-      Container := Add_Parent (Container, 9, [Left], Middle);
+      Container := Add_Parent (Container, 9, N_Left, Middle);
 
-      Assert (Get (Container, [])                     = 1, "bad value for 1");
-      Assert (Get (Container, [Left])                 = 9, "bad value for 9");
-      Assert (Get (Container, [Left, Middle])         = 2, "bad value for 2");
-      Assert (Get (Container, [Left, Middle, Left])   = 3, "bad value for 3");
-      Assert (Get (Container, [Left, Middle, Middle]) = 4, "bad value for 4");
-      Assert (Get (Container, [Middle])               = 5, "bad value for 5");
-      Assert (Get (Container, [Right])                = 6, "bad value for 6");
-      Assert (Get (Container, [Right, Middle])        = 7, "bad value for 7");
-      Assert (Get (Container, [Right, Middle, Right]) = 8, "bad value for 8");
+      Assert (Get (Container, Root)                 = 1, "bad value for 1");
+      Assert (Get (Container, N_Left)               = 9, "bad value for 9");
+      Assert (Get (Container, N_Left_Middle)        = 2, "bad value for 2");
+      Assert (Get (Container, N_Left_Middle_Left)   = 3, "bad value for 3");
+      Assert (Get (Container, N_Left_Middle_Middle) = 4, "bad value for 4");
+      Assert (Get (Container, N_Middle)             = 5, "bad value for 5");
+      Assert (Get (Container, N_Right)              = 6, "bad value for 6");
+      Assert (Get (Container, N_Right_Middle)       = 7, "bad value for 7");
+      Assert (Get (Container, N_Right_Middle_Right) = 8, "bad value for 8");
    end Test_Add_Parent_Non_Root;
 
    ------------------

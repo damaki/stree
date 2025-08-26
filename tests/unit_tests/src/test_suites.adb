@@ -15,10 +15,8 @@ with Tree_Tests.Last_Tests;
 with Tree_Tests.Length_Tests;
 with Tree_Tests.Next_Tests;
 with Tree_Tests.Parent_Tests;
-with Tree_Tests.Prev_Tests;
 with Tree_Tests.Root_Element_Tests;
 with Tree_Tests.Root_Tests;
-with Tree_Tests.Move_Subtree_Tests;
 
 with Functional_Tree_Tests.Add_Tests;
 with Functional_Tree_Tests.Add_Parent_Tests;
@@ -42,10 +40,8 @@ is
       Tree_Tests.Length_Tests.Add_To_Suite (S.all);
       Tree_Tests.Next_Tests.Add_To_Suite (S.all);
       Tree_Tests.Parent_Tests.Add_To_Suite (S.all);
-      Tree_Tests.Prev_Tests.Add_To_Suite (S.all);
       Tree_Tests.Root_Element_Tests.Add_To_Suite (S.all);
       Tree_Tests.Root_Tests.Add_To_Suite (S.all);
-      Tree_Tests.Move_Subtree_Tests.Add_To_Suite (S.all);
 
       Functional_Tree_Tests.Add_Tests.Add_To_Suite (S.all);
       Functional_Tree_Tests.Add_Parent_Tests.Add_To_Suite (S.all);
