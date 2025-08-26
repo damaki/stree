@@ -1,4 +1,4 @@
-with Stree.Functional_Multiway_Trees;
+with Stree.Functional.Multiway_Trees;
 
 package P with
   SPARK_Mode => On
@@ -6,7 +6,7 @@ is
 
    type Way_Type is (Left, Middle, Right);
 
-   package P_Trees is new Stree.Functional_Multiway_Trees
+   package P_Trees is new Stree.Functional.Multiway_Trees
      (Element_Type => Integer,
       Way_Type     => Way_Type);
    use P_Trees;

@@ -6,7 +6,7 @@ is
    begin
       T := Empty_Tree;
 
-      pragma Assert (not Contains (T, Root_Node));
+      pragma Assert (not Contains (T, Root));
    end Create;
 
 end P;
