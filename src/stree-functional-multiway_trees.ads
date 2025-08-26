@@ -4,10 +4,10 @@
 --  SPDX-License-Identifier: Apache-2.0
 --
 with SPARK.Big_Integers;
-with SPARK.Containers.Functional.Infinite_Sequences;
 with SPARK.Containers.Parameter_Checks;
 
 private with Ada.Finalization;
+private with SPARK.Containers.Functional.Infinite_Sequences;
 private with SPARK.Containers.Formal.Unbounded_Ordered_Maps;
 
 generic
@@ -35,20 +35,21 @@ generic
    with procedure Equivalent_Elements_Transitive
      (X, Y, Z : Element_Type) is null
      with Ghost;
-package Stree.Functional_Multiway_Trees with
+package Stree.Functional.Multiway_Trees with
   SPARK_Mode,
   Always_Terminates
 is
 
-   use type SPARK.Big_Integers.Big_Integer;
+   use all type SPARK.Big_Integers.Big_Integer;
 
    -----------
    -- Paths --
    -----------
 
    --  Nodes in the tree are referenced by the path taken through the tree
-   --  to reach that node, starting from the root of the tree. The path is a
-   --  sequence of directions taken from each node along the path.
+   --  to reach that node, starting from the root of the tree. The path is
+   --  modelled as a sequence of directions taken from each node along the
+   --  path.
    --
    --  For example, given a Way_Type defined as follows:
    --     type Way_Type is (Left, Right);
@@ -70,33 +71,145 @@ is
    --
    --  Then the path to node 7 is the sequence: [Left, Left, Right]
 
-   package Way_Sequences is new SPARK.Containers.Functional.Infinite_Sequences
-     (Element_Type => Way_Type);
-   use all type Way_Sequences.Sequence;
+   type Path_Type is private with
+     Iterable => (First       => First,
+                  Has_Element => Has_Element,
+                  Next        => Next,
+                  Element     => Get);
 
-   subtype Path_Type is Way_Sequences.Sequence;
+   function First (Path : Path_Type) return SPARK.Big_Integers.Big_Integer with
+     Inline,
+     Global   => null,
+     Post     => First'Result = 1,
+     Annotate => (GNATprove, Inline_For_Proof);
 
-   Root_Node : constant Path_Type := Way_Sequences.Empty_Sequence;
+   function Length (Path : Path_Type) return SPARK.Big_Integers.Big_Natural
+   with
+     Global => null;
+
+   function Has_Element
+     (Path     : Path_Type;
+      Position : SPARK.Big_Integers.Big_Integer) return Boolean
+   is
+     (In_Range (Position, 1, Length (Path)))
+   with
+     Annotate => (GNATprove, Inline_For_Proof);
+
+   function Last (Path : Path_Type) return SPARK.Big_Integers.Big_Integer is
+     (Length (Path));
+
+   function Next
+     (Path     : Path_Type;
+      Position : SPARK.Big_Integers.Big_Integer)
+      return SPARK.Big_Integers.Big_Integer
+   with
+     Inline,
+     Global   => null,
+     Post     => Next'Result = Position + 1,
+     Annotate => (GNATprove, Inline_For_Proof);
+
+   function Get
+     (Path     : Path_Type;
+      Position : SPARK.Big_Integers.Big_Integer) return Way_Type
+   with
+     Global => null,
+     Pre    => Has_Element (Path, Position);
+
+   function Range_Equal
+     (Left  : Path_Type;
+      Right : Path_Type;
+      Fst   : SPARK.Big_Integers.Big_Positive;
+      Lst   : SPARK.Big_Integers.Big_Natural) return Boolean
+   with
+     Ghost,
+     Global => null,
+     Pre    => Lst <= Last (Left) and then Lst <= Last (Right),
+     Post   =>
+       Range_Equal'Result =
+         (for all J in Left =>
+            (if Fst <= J and then J <= Lst then
+               Get (Left, J) = Get (Right, J))),
+     Annotate => (GNATprove, Inline_For_Proof);
+
+   function Range_Shifted
+     (Left   : Path_Type;
+      Right  : Path_Type;
+      Fst    : SPARK.Big_Integers.Big_Positive;
+      Lst    : SPARK.Big_Integers.Big_Natural;
+      Offset : SPARK.Big_Integers.Big_Integer) return Boolean
+   with
+     Ghost,
+     Global => null,
+     Pre    => Lst <= Last (Left) and then Lst <= Last (Right),
+     Post   =>
+       Range_Shifted'Result =
+         ((for all J in Left =>
+             (if Fst <= J and then J <= Lst then
+                Get (Left, J) = Get (Right, J + Offset)))
+          and then
+            (for all J in Right =>
+               (if Fst + Offset <= J and then J <= Lst + Offset then
+                  Get (Left, J - Offset) = Get (Right, J)))),
+     Annotate => (GNATprove, Inline_For_Proof);
+
+   function Path_Logic_Equal (Left, Right : Path_Type) return Boolean with
+     Global   => null,
+     Annotate => (GNATprove, Logical_Equal);
+
+   overriding
+   function "=" (Left, Right : Path_Type) return Boolean with
+     Global => null,
+     Post   => "="'Result =
+                 (Length (Left) = Length (Right)
+                  and then (for all I in Left =>
+                              Get (Left, I) = Get (Right, I)))
+
+               and then "="'Result = Path_Logic_Equal (Left, Right);
+
+   function "<" (Left, Right : Path_Type) return Boolean with
+     Global   => null,
+     Post     =>
+       "<"'Result =
+         (Length (Left) < Length (Right)
+          and then
+            (for all I in Left =>
+               Get (Left, I) = Get (Right, I))),
+     Annotate => (GNATprove, Inline_For_Proof);
+
+   function "<=" (Left, Right : Path_Type) return Boolean with
+     Global   => null,
+     Post     =>
+       "<="'Result = (Left < Right or else Left = Right),
+     Annotate => (GNATprove, Inline_For_Proof);
+
+   function Root return Path_Type with
+     Global => null,
+     Post   => Length (Root'Result) = 0;
 
    function Is_Root (Path : Path_Type) return Boolean is
-     (Length (Path) = 0);
+     (Length (Path) = 0)
+   with
+     Annotate => (GNATprove, Inline_For_Proof);
    --  Returns True if the given path references the root node
 
-   function Parent (Path : Path_Type) return Path_Type is
+   function Parent (Path : Path_Type) return Path_Type with
    --  Get the path that references the immediate ancestor of Path
-     (Remove (Path, Length (Path)))
-   with
-     Pre  => not Is_Root (Path),
-     Post => Parent'Result < Path
-             and then Length (Parent'Result) = Length (Path) - 1;
+     Global => null,
+     Pre    => not Is_Root (Path),
+     Post   =>
+       Length (Parent'Result) = Length (Path) - 1
+       and then Range_Equal (Parent'Result, Path, 1, Length (Path) - 1)
+       and then Parent'Result < Path;
 
-   function Child (Path : Path_Type; Way : Way_Type) return Path_Type is
+   function Child (Path : Path_Type; Way : Way_Type) return Path_Type with
    --  Get the path that references the immediate descendant of Path in the
    --  specified direction.
-     (Add (Path, Way))
-   with
-     Post => Path < Child'Result
-             and then Length (Child'Result) = Length (Path) + 1;
+     Global => null,
+     Post   =>
+       Length (Child'Result) = Length (Path) + 1
+       and then Range_Equal (Child'Result, Path, 1, Length (Path))
+       and then Get (Child'Result, Length (Child'Result)) = Way
+       and then Path < Child'Result;
 
    function Sibling (Path : Path_Type; Way : Way_Type) return Path_Type is
      (Child (Parent (Path), Way))
@@ -107,7 +220,7 @@ is
    function Way_From_Parent (Path : Path_Type) return Way_Type is
      (Get (Path, Length (Path)))
    with
-     Pre => Length (Path) > 0;
+     Pre  => Length (Path) > 0;
 
    function Is_Ancestor (Left, Right : Path_Type) return Boolean is
    --  Returns True if Left is an ancestor node of Right
@@ -148,14 +261,45 @@ is
      Global => null,
      Pre    => Count <= Length (Path),
      Post   =>
-       Length (Remove_Front'Result) =
-         Length (Path) - Count
+       Length (Remove_Front'Result) = Length (Path) - Count
        and then Range_Shifted
                   (Left   => Remove_Front'Result,
                    Right  => Path,
                    Fst    => 1,
                    Lst    => Length (Path) - Count,
                    Offset => Count);
+
+   function Insert
+     (Path  : Path_Type;
+      After : SPARK.Big_Integers.Big_Natural;
+      Value : Way_Type) return Path_Type
+   with
+     Global => null,
+     Pre    => After <= Length (Path),
+     Post   => Length (Insert'Result) = Length (Path) + 1
+               and then Range_Equal (Path, Insert'Result, 1, After)
+               and then Get (Insert'Result, After + 1) = Value
+               and then Range_Shifted
+                          (Left   => Path,
+                           Right  => Insert'Result,
+                           Fst    => After + 2,
+                           Lst    => Length (Path) + 1,
+                           Offset => 1);
+
+   function Remove
+     (Path  : Path_Type;
+      Index : SPARK.Big_Integers.Big_Positive) return Path_Type
+   with
+     Global => null,
+     Pre    => Index <= Length (Path),
+     Post   => Length (Remove'Result) = Length (Path) - 1
+               and then Range_Equal (Path, Remove'Result, 1, Index - 1)
+               and then Range_Shifted
+                          (Left   => Path,
+                           Right  => Remove'Result,
+                           Fst    => Index + 1,
+                           Lst    => Length (Path) - 1,
+                           Offset => -1);
 
    function Splice_Path
      (Left_Subtree  : Path_Type;
@@ -167,7 +311,7 @@ is
 
    with
      Global => null,
-     Pre    => Left_Subtree <= Left,
+     Pre    => In_Subtree (Left, Left_Subtree),
      Post   =>
        Range_Equal
          (Left  => Splice_Path'Result,
@@ -235,7 +379,7 @@ is
      Global   => null,
      Annotate => (GNATprove, Automatic_Instantiation),
      Pre      => not Is_Empty (Container),
-     Post     => Contains (Container, Root_Node);
+     Post     => Contains (Container, Root);
 
    procedure Lemma_Contains_Transitive
      (Container : Tree;
@@ -313,7 +457,7 @@ is
      Global   => null,
      Annotate => (GNATprove, Automatic_Instantiation),
      Pre      => Contains (Container, Node),
-     Post     => Way_Sequences.Length (Node) < Length (Container);
+     Post     => Length (Node) < Length (Container);
 
    ------------------------
    -- Property Functions --
@@ -338,9 +482,10 @@ is
    function Nodes_Included (Left, Right : Tree) return Boolean with
    --  Returns True if every node in Left is in Right
 
-     Global => null,
-     Post   => Nodes_Included'Result =
-                 (for all Node of Left => Contains (Right, Node));
+     Global   => null,
+     Post     => Nodes_Included'Result =
+                   (for all Node of Left => Contains (Right, Node)),
+     Annotate => (GNATprove, Inline_For_Proof);
 
    function Nodes_Included_In_Subtrees
      (Left, Right   : Tree;
@@ -353,9 +498,24 @@ is
      Post   =>
        Nodes_Included_In_Subtrees'Result =
          (for all Node of Left =>
-            (if Left_Subtree <= Node then
+            (if In_Subtree (Node, Left_Subtree) then
                Contains
-                 (Right, Splice_Path (Left_Subtree, Node, Right_Subtree))));
+                 (Right, Splice_Path (Left_Subtree, Node, Right_Subtree)))),
+     Annotate => (GNATprove, Inline_For_Proof);
+
+   function Nodes_Removed
+     (Left, Right  : Tree;
+      Subtree_Root : Path_Type) return Boolean
+   --  Returns True if all nodes in a subtree of Left are removed from Right
+
+   with
+     Global => null,
+     Post   =>
+       Nodes_Removed'Result =
+         (for all Node of Left =>
+            (if In_Subtree (Node, Subtree_Root) then
+               not Contains (Right, Node))),
+     Annotate => (GNATprove, Inline_For_Proof);
 
    function Same_Nodes (Left, Right : Tree) return Boolean with
    --  Returns True if Left and Right have the same tree structure
@@ -381,7 +541,8 @@ is
                              (Left          => Right,
                               Right         => Left,
                               Left_Subtree  => Right_Subtree,
-                              Right_Subtree => Left_Subtree));
+                              Right_Subtree => Left_Subtree)),
+     Annotate => (GNATprove, Inline_For_Proof);
 
    function Nodes_Included_Except_Subtree
      (Left          : Tree;
@@ -392,8 +553,9 @@ is
      Post   =>
        Nodes_Included_Except_Subtree'Result =
          (for all Node of Left =>
-            (if not (Excluded_Node <= Node) then
-               Contains (Right, Node)));
+            (if not In_Subtree (Node, Excluded_Node) then
+               Contains (Right, Node))),
+     Annotate => (GNATprove, Inline_For_Proof);
    --  Returns True if Left contains only nodes of Right, except for
    --  Excluded_Node and its descendants.
 
@@ -468,16 +630,11 @@ is
        Length (Add_Parent'Result) = Length (Container) + 1
        and then Contains (Add_Parent'Result, Node)
        and then Element_Logic_Equal (New_Item, Get (Add_Parent'Result, Node))
-       and then Elements_Equal_In_Subtrees
-                  (Left          => Container,
-                   Left_Subtree  => Node,
-                   Right         => Add_Parent'Result,
-                   Right_Subtree => Child (Node, Way))
-       and then Elements_Equal_In_Subtrees
-                  (Left          => Add_Parent'Result,
-                   Left_Subtree  => Child (Node, Way),
-                   Right         => Container,
-                   Right_Subtree => Node)
+       and then Subtree_Elements_Shifted
+                  (Left         => Container,
+                   Right        => Add_Parent'Result,
+                   Subtree_Root => Node,
+                   Way          => Way)
        and then Elements_Equal_Except_Subtree
                   (Add_Parent'Result, Container, Node);
 
@@ -490,9 +647,9 @@ is
        Length (Remove'Result) < Length (Container)
        and then (if Is_Leaf (Container, Node) then
                    Length (Remove'Result) = Length (Container) - 1)
-       and then not Contains (Remove'Result, Node)
+       and then Nodes_Removed (Container, Remove'Result, Node)
        and then Elements_Equal (Remove'Result, Container)
-       and then Nodes_Included_Except_Subtree (Container, Remove'Result, Node);
+       and then Elements_Equal_Except_Subtree (Container, Remove'Result, Node);
 
    function Set
      (Container : Tree;
@@ -552,7 +709,7 @@ is
      Post   =>
        Elements_Equal_In_Subtrees'Result =
          (for all Node of Left =>
-            (if Left_Subtree <= Node then
+            (if In_Subtree (Node, Left_Subtree) then
                Contains (Right,
                          Splice_Path (Left_Subtree, Node, Right_Subtree))
                and then
@@ -565,6 +722,10 @@ is
      (Left          : Tree;
       Right         : Tree;
       Excluded_Node : Path_Type) return Boolean
+   --  Returns True if all elements in Left are equal to the equivalent node in
+   --  Right, except for the element at Excluded_Node in Left which is not
+   --  checked.
+
    with
      Ghost,
      Global => null,
@@ -577,19 +738,57 @@ is
                           (Get (Left, Node), Get (Right, Node))));
 
    function Elements_Equal_Except_Subtree
-     (Left          : Tree;
-      Right         : Tree;
-      Excluded_Node : Path_Type) return Boolean
+     (Left         : Tree;
+      Right        : Tree;
+      Subtree_Root : Path_Type) return Boolean
+   --  Returns True if all elements in Left are equal to the equivalent node in
+   --  Right, except for elements in Left that are within the subtree rooted at
+   --  Subtree_Root.
+
    with
      Ghost,
      Global => null,
      Post   =>
        Elements_Equal_Except_Subtree'Result =
          (for all Node of Left =>
-            (if not (Excluded_Node <= Node) then
+            (if not In_Subtree (Node, Subtree_Root) then
                Contains (Right, Node)
                and then Element_Logic_Equal
-                          (Get (Left, Node), Get (Right, Node))));
+                          (Get (Left, Node), Get (Right, Node)))),
+     Annotate => (GNATprove, Inline_For_Proof);
+
+   function Subtree_Elements_Shifted
+     (Left         : Tree;
+      Right        : Tree;
+      Subtree_Root : Path_Type;
+      Way          : Way_Type) return Boolean
+   --  Compares elements of two subtrees for equivalence, where the subtree in
+   --  the Left tree is rooted at Subtree_Root, and the subtree in Right is
+   --  rooted at Child (Subtree_Root, Way), i.e. the Right subtree is shifted
+   --  down by one extra Way.
+
+   with
+     Ghost,
+     Global => null,
+     Post   =>
+       Subtree_Elements_Shifted'Result =
+         ((for all Node of Left =>
+             (if In_Subtree (Node, Subtree_Root) then
+                Contains (Right, Insert (Node, Length (Subtree_Root), Way))
+                and then
+                  Element_Logic_Equal
+                    (Get (Left, Node),
+                     Get (Right, Insert (Node, Length (Subtree_Root), Way)))))
+
+          and then
+            (for all Node of Right =>
+               (if In_Subtree (Node, Child (Subtree_Root, Way)) then
+                  Contains (Left, Remove (Node, Length (Subtree_Root) + 1))
+                  and then
+                    Element_Logic_Equal
+                      (Get (Left, Remove (Node, Length (Subtree_Root) + 1)),
+                       Get (Right, Node))))),
+       Annotate => (GNATprove, Inline_For_Proof);
 
    --------------------------
    -- Instantiation Checks --
@@ -662,6 +861,38 @@ is
 private
 
    pragma SPARK_Mode (Off);
+
+   package WS is new SPARK.Containers.Functional.Infinite_Sequences
+     (Element_Type => Way_Type);
+
+   type Path_Type is record
+      Seq : WS.Sequence;
+   end record;
+
+   function Path_Logic_Equal (Left, Right : Path_Type) return Boolean is
+     (WS."=" (Left.Seq, Right.Seq));
+
+   overriding
+   function "=" (Left, Right : Path_Type) return Boolean is
+     (WS."=" (Left.Seq, Right.Seq));
+
+   function "<" (Left, Right : Path_Type) return Boolean is
+     (WS."<" (Left.Seq, Right.Seq));
+
+   function "<=" (Left, Right : Path_Type) return Boolean is
+     (WS."<=" (Left.Seq, Right.Seq));
+
+   function Length (Path : Path_Type) return SPARK.Big_Integers.Big_Natural is
+     (WS.Length (Path.Seq));
+
+   function Parent (Path : Path_Type) return Path_Type is
+     (Path_Type'(Seq => WS.Remove (Path.Seq, Length (Path))));
+
+   function Child (Path : Path_Type; Way : Way_Type) return Path_Type is
+     (Path_Type'(Seq => WS.Add (Path.Seq, Way)));
+
+   function Root return Path_Type is
+     (Path_Type'(Seq => WS.Empty_Sequence));
 
    --------------
    -- Elements --
@@ -737,9 +968,9 @@ private
       Valid : Boolean;
    end record;
 
-   No_Element : constant Private_Path :=
-     (Path  => Way_Sequences.Empty_Sequence,
-      Valid => False);
+   function No_Element return Private_Path is
+     (Private_Path'(Path  => Root,
+                    Valid => False));
 
    function Find_Node
      (Container : Tree;
@@ -821,8 +1052,8 @@ private
    --------------------------
 
    function Copy_Tree_Except_Subtree
-     (Root    : Not_Null_Node_Access;
-      Exclude : Node_Access) return Controlled_Tree_Access;
+     (Root_Acc : Not_Null_Node_Access;
+      Exclude  : Node_Access) return Controlled_Tree_Access;
    --  Create a deep copy of a tree, except for the specified Exclude node
    --  and its descendants.
    --
@@ -831,4 +1062,4 @@ private
    function Create_Tree (New_Item : Element_Type) return Tree;
    --  Create a tree with a single root node
 
-end Stree.Functional_Multiway_Trees;
+end Stree.Functional.Multiway_Trees;

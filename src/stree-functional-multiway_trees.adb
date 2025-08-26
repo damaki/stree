@@ -7,7 +7,7 @@ with Ada.Unchecked_Deallocation;
 
 with SPARK.Containers;
 
-package body Stree.Functional_Multiway_Trees with
+package body Stree.Functional.Multiway_Trees with
   SPARK_Mode => Off
 is
 
@@ -172,8 +172,6 @@ is
       New_Item  : Element_Type;
       New_Node  : Path_Type) return Tree
    is
-      use Way_Sequences;
-
       New_Element : Controlled_Element_Access;
       New_Tree : Tree;
       Node     : Node_Access;
@@ -185,8 +183,8 @@ is
       end if;
 
       New_Tree := Tree'(Ref => Copy_Tree_Except_Subtree
-                                 (Root    => Container.Ref.Ref.all.Root_Node,
-                                  Exclude => null));
+                                 (Root_Acc => Container.Ref.Ref.all.Root_Node,
+                                  Exclude  => null));
 
       pragma Assert (Elements_Equal (Container, New_Tree));
       pragma Assert (Elements_Equal (New_Tree, Container));
@@ -250,8 +248,8 @@ is
       end if;
 
       New_Tree := Tree'(Ref => Copy_Tree_Except_Subtree
-                                 (Root    => Container.Ref.Ref.all.Root_Node,
-                                  Exclude => null));
+                                 (Root_Acc => Container.Ref.Ref.all.Root_Node,
+                                  Exclude  => null));
 
       Node_Acc := Find_Node (New_Tree, Node);
 
@@ -330,13 +328,13 @@ is
    ------------
 
    function Concat (Left, Right : Path_Type) return Path_Type is
-      Result : Path_Type := Left;
+      Result : WS.Sequence := Left.Seq;
    begin
       for Value of Right loop
-         Result := Way_Sequences.Add (Result, Value);
+         Result := WS.Add (Result, Value);
       end loop;
 
-      return Result;
+      return Path_Type'(Seq => Result);
    end Concat;
 
    --------------
@@ -354,8 +352,8 @@ is
    ------------------------------
 
    function Copy_Tree_Except_Subtree
-     (Root    : Not_Null_Node_Access;
-      Exclude : Node_Access) return Controlled_Tree_Access
+     (Root_Acc : Not_Null_Node_Access;
+      Exclude  : Node_Access) return Controlled_Tree_Access
    is
       use type Node_Maps.Cursor;
 
@@ -367,7 +365,7 @@ is
       Pos        : Node_Maps.Cursor;
 
    begin
-      if Exclude = Root then
+      if Exclude = Root_Acc then
          return Controlled_Tree_Access'
                   (Ada.Finalization.Controlled with
                    Ref => null);
@@ -383,9 +381,9 @@ is
              (Parent          => null,
               Way_From_Parent => Way_Type'First,
               Children        => Node_Maps.Empty_Map,
-              Element         => Root.all.Element);
+              Element         => Root_Acc.all.Element);
 
-         Old_Node := Root;
+         Old_Node := Root_Acc;
          New_Node := New_Tree.Ref.all.Root_Node;
 
          while Old_Node /= null loop
@@ -598,10 +596,10 @@ is
    function Elements_Equal_Except_Subtree
      (Left          : Tree;
       Right         : Tree;
-      Excluded_Node : Path_Type) return Boolean
+      Subtree_Root : Path_Type) return Boolean
    is
-      Excluded_Node_Acc : constant Node_Access :=
-                            Find_Node (Left, Excluded_Node);
+      Subtree_Root_Acc : constant Node_Access :=
+                            Find_Node (Left, Subtree_Root);
 
       L, R    : Node_Access;
       Success : Boolean;
@@ -615,14 +613,14 @@ is
       --  If the root node is excluded, then the entire Tree of Left is
       --  excluded, so we are effectively comparing an empty tree.
 
-      if Is_Root (Excluded_Node) then
+      if Is_Root (Subtree_Root) then
          return True;
       end if;
 
       L := Left.Ref.Ref.all.Root_Node;
       R := Right.Ref.Ref.all.Root_Node;
 
-      First_Node_In_Both_Except (L, R, Excluded_Node_Acc, Success);
+      First_Node_In_Both_Except (L, R, Subtree_Root_Acc, Success);
 
       while Success and then L /= null loop
          if not Element_Logic_Equal
@@ -632,7 +630,7 @@ is
             return False;
          end if;
 
-         Next_Node_In_Both_Except (L, R, Excluded_Node_Acc, Success);
+         Next_Node_In_Both_Except (L, R, Subtree_Root_Acc, Success);
       end loop;
 
       return Success;
@@ -779,6 +777,12 @@ is
       return Node;
    end Find_Node;
 
+   function First (Path : Path_Type) return SPARK.Big_Integers.Big_Integer is
+      pragma Unreferenced (Path);
+   begin
+      return 1;
+   end First;
+
    ----------------
    -- First_Node --
    ----------------
@@ -860,6 +864,12 @@ is
    -- Get --
    ---------
 
+   function Get
+     (Path     : Path_Type;
+      Position : SPARK.Big_Integers.Big_Integer) return Way_Type
+   is
+     (WS.Get (Path.Seq, Position));
+
    function Get (Container : Tree; Path : Path_Type) return Element_Type is
       Node : constant Node_Access := Find_Node (Container, Path);
    begin
@@ -869,6 +879,35 @@ is
 
       return Node.all.Element.Ref.Element.all;
    end Get;
+
+   ------------
+   -- Insert --
+   ------------
+
+   function Insert
+     (Path  : Path_Type;
+      After : SPARK.Big_Integers.Big_Natural;
+      Value : Way_Type) return Path_Type
+   is
+      Result : Path_Type := Root;
+      I      : SPARK.Big_Integers.Big_Natural := 0;
+
+   begin
+      while I < Length (Path) loop
+         if I = After then
+            Result.Seq := WS.Add (Result.Seq, Value);
+         end if;
+
+         I          := I + 1;
+         Result.Seq := WS.Add (Result.Seq, Get (Path, I));
+      end loop;
+
+      if I = After then
+         Result.Seq := WS.Add (Result.Seq, Value);
+      end if;
+
+      return Result;
+   end Insert;
 
    --------------
    -- Is_Empty --
@@ -942,8 +981,6 @@ is
      (Container : Tree;
       Path      : Private_Path) return Private_Path
    is
-      use Way_Sequences;
-
       Node : Node_Access;
 
    begin
@@ -1061,6 +1098,20 @@ is
 
       return Result;
    end Length;
+
+   ----------
+   -- Next --
+   ----------
+
+   function Next
+     (Path     : Path_Type;
+      Position : SPARK.Big_Integers.Big_Integer)
+      return SPARK.Big_Integers.Big_Integer
+   is
+      pragma Unreferenced (Path);
+   begin
+      return Position + 1;
+   end Next;
 
    ---------------
    -- Next_Node --
@@ -1189,7 +1240,7 @@ is
    --------------------
 
    function Nodes_Included (Left, Right : Tree) return Boolean is
-     (Nodes_Included_In_Subtrees (Left, Right, Root_Node, Root_Node));
+     (Nodes_Included_In_Subtrees (Left, Right, Root, Root));
 
    -----------------------------------
    -- Nodes_Included_Except_Subtree --
@@ -1269,28 +1320,69 @@ is
       return Success;
    end Nodes_Included_In_Subtrees;
 
+   -------------------
+   -- Nodes_Removed --
+   -------------------
+
+   function Nodes_Removed
+     (Left, Right  : Tree;
+      Subtree_Root : Path_Type) return Boolean
+   is
+     (Find_Node (Right, Subtree_Root) = null);
+
    ------------------
    -- Path_To_Node --
    ------------------
 
    function Path_To_Node (Node : Not_Null_Node_Access) return Path_Type is
-      Path : Path_Type   := Way_Sequences.Empty_Sequence;
+      Path : WS.Sequence := WS.Empty_Sequence;
       N    : Node_Access := Node;
 
    begin
       --  Walk up the tree towards the root, building the path as we go
 
       while N /= null loop
-         Path := Way_Sequences.Add (Path, 1, N.all.Way_From_Parent);
+         Path := WS.Add (Path, 1, N.all.Way_From_Parent);
          N    := N.all.Parent;
       end loop;
 
-      return Path;
+      return Path_Type'(Seq => Path);
    end Path_To_Node;
+
+   -----------------
+   -- Range_Equal --
+   -----------------
+
+   function Range_Equal
+     (Left  : Path_Type;
+      Right : Path_Type;
+      Fst   : SPARK.Big_Integers.Big_Positive;
+      Lst   : SPARK.Big_Integers.Big_Natural) return Boolean
+   is
+     (WS.Range_Equal (Left.Seq, Right.Seq, Fst, Lst));
+
+   -------------------
+   -- Range_Shifted --
+   -------------------
+
+   function Range_Shifted
+     (Left   : Path_Type;
+      Right  : Path_Type;
+      Fst    : SPARK.Big_Integers.Big_Positive;
+      Lst    : SPARK.Big_Integers.Big_Natural;
+      Offset : SPARK.Big_Integers.Big_Integer) return Boolean
+   is
+     (WS.Range_Shifted (Left.Seq, Right.Seq, Fst, Lst, Offset));
 
    ------------
    -- Remove --
    ------------
+
+   function Remove
+     (Path  : Path_Type;
+      Index : SPARK.Big_Integers.Big_Positive) return Path_Type
+   is
+     (Path_Type'(Seq => WS.Remove (Path.Seq, Index)));
 
    function Remove (Container : Tree; Node : Path_Type) return Tree is
       Excluded_Node : constant Node_Access := Find_Node (Container, Node);
@@ -1299,8 +1391,8 @@ is
          return Container;
       else
          return Tree'(Ref => Copy_Tree_Except_Subtree
-                               (Root    => Container.Ref.Ref.all.Root_Node,
-                                Exclude => Excluded_Node));
+                               (Root_Acc => Container.Ref.Ref.all.Root_Node,
+                                Exclude  => Excluded_Node));
       end if;
    end Remove;
 
@@ -1312,18 +1404,16 @@ is
      (Path  : Path_Type;
       Count : SPARK.Big_Integers.Big_Natural) return Path_Type
    is
-      use Way_Sequences;
-
-      Result : Path_Type                      := Path;
+      Result : WS.Sequence                    := Path.Seq;
       I      : SPARK.Big_Integers.Big_Natural := 0;
 
    begin
       while I < Count loop
-         Result := Remove (Result, 1);
+         Result := WS.Remove (Result, 1);
          I      := I + 1;
       end loop;
 
-      return Result;
+      return Path_Type'(Seq => Result);
    end Remove_Front;
 
    ----------------
@@ -1331,7 +1421,7 @@ is
    ----------------
 
    function Same_Nodes (Left, Right : Tree) return Boolean is
-     (Same_Nodes_In_Subtrees (Left, Right, Root_Node, Root_Node));
+     (Same_Nodes_In_Subtrees (Left, Right, Root, Root));
 
    ----------------------------
    -- Same_Nodes_In_Subtrees --
@@ -1433,8 +1523,8 @@ is
       end if;
 
       New_Tree := (Ref => Copy_Tree_Except_Subtree
-                            (Root    => Container.Ref.Ref.all.Root_Node,
-                             Exclude => null));
+                            (Root_Acc => Container.Ref.Ref.all.Root_Node,
+                             Exclude  => null));
 
       Node_Acc := Find_Node (New_Tree, Node);
 
@@ -1460,10 +1550,24 @@ is
       Left               : Path_Type;
       Right_Subtree : Path_Type) return Path_Type
    is
-      use Way_Sequences;
-   begin
-      return Concat (Right_Subtree,
-                     Remove_Front (Left, Length (Left_Subtree)));
-   end Splice_Path;
+     (Concat (Right_Subtree, Remove_Front (Left, Length (Left_Subtree))));
 
-end Stree.Functional_Multiway_Trees;
+   ------------------------------
+   -- Subtree_Elements_Shifted --
+   ------------------------------
+
+   function Subtree_Elements_Shifted
+     (Left         : Tree;
+      Right        : Tree;
+      Subtree_Root : Path_Type;
+      Way          : Way_Type) return Boolean
+   is
+     (for all Node of Left =>
+        (if Subtree_Root <= Node then
+           Contains (Right, Insert (Node, Length (Subtree_Root), Way))
+           and then
+             Element_Logic_Equal
+               (Get (Left, Node),
+                Get (Right, Insert (Node, Length (Subtree_Root), Way)))));
+
+end Stree.Functional.Multiway_Trees;
