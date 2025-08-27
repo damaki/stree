@@ -149,11 +149,6 @@ is
       function "="  (Left, Right : M.Tree) return Boolean renames M."=";
       function "<=" (Left, Right : M.Tree) return Boolean renames M."<=";
 
-      package P is new SPARK.Containers.Functional.Maps
-        (Key_Type     => Cursor,
-         Element_Type => M.Path_Type,
-         "="          => "=");
-
       function Model (Container : Tree) return M.Tree with
       --  The high-level model of a tree is a tree that references tree nodes
       --  by their paths from the root. Cursors are not represented in this
@@ -163,6 +158,24 @@ is
         Global => null,
         Post   =>
           Length (Container) = From_Big_Integer (M.Length (Model'Result));
+
+      ---------------------------------
+      -- Mapping of Cursors to Paths --
+      ---------------------------------
+
+      --  The functional tree does not model cursors but instead references
+      --  tree nodes by the path to the node from the root as a sequence of
+      --  directions (ways) taken at each node along the path.
+      --
+      --  To model cursors we define a mapping between cursors and paths.
+      --  The mapping is bijective, i.e. each valid cursor maps to a unique
+      --  path in the formal model, and the path of each node in the formal
+      --  model's tree maps to a unique cursor.
+
+      package P is new SPARK.Containers.Functional.Maps
+        (Key_Type     => Cursor,
+         Element_Type => M.Path_Type,
+         "="          => "=");
 
       function Paths (Container : Tree) return P.Map with
       --  Get the mapping of cursors to paths in the model
@@ -334,10 +347,11 @@ is
       --
       --  For example, given:
       --   * a binary tree with ways L and R;
-      --   * Old_Subtree = [L, L, L]; and
-      --   * New_Subtree = [R, R, R].
+      --   * Old_Subtree = [L, L]; and
+      --   * New_Subtree = [R, R].
       --
-      --
+      --  Then for an arbitrary cursor in Left which maps to path [L, L, R, L],
+      --  that same cursor now maps to [R, R, R, L] in Right.
 
       with
         Ghost,
@@ -371,6 +385,9 @@ is
       function Same_Mapping_Except
         (Left, Right : Tree;
          Position    : Cursor) return Boolean
+      --  Returns true if the bidirectional mapping of cursors to paths is
+      --  the same in Left and Right, except for the node at Position.
+
       with
         Ghost,
         Global => null,
