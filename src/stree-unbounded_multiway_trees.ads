@@ -445,6 +445,19 @@ is
                   (if not M.In_Subtree (Path, M_Path (Left, Position))
                    then M_Cursor (Left, Path) = M_Cursor (Right, Path))));
 
+      function Ancestry_Preserved (Left, Right : Tree) return Boolean with
+        Ghost,
+        Global => null,
+        Post   =>
+          Ancestry_Preserved'Result =
+            (for all C1 of Paths (Left) =>
+               (for all C2 of Paths (Left) =>
+                  (if M_Path (Left, C1) < M_Path (Left, C2) then
+                     P.Has_Key (Paths (Right), C1)
+                     and then P.Has_Key (Paths (Right), C2)
+                     and then M_Path (Right, C1) < M_Path (Right, C2)))),
+        Annotate => (GNATprove, Inline_For_Proof);
+
    end Formal_Model;
    use Formal_Model;
    use type M.Path_Type;
@@ -846,7 +859,11 @@ is
      Global => null,
      Pre    => Is_Empty (Container),
      Post   =>
-       Model (Container) = M.Add (M.Empty_Tree, New_Item, M.Root)
+       M.Length (Model (Container)) = 1
+       and then M.Contains (Model (Container), M.Root)
+       and then M.Element_Logic_Equal
+                  (M.Get (Model (Container), M.Root), New_Item)
+       and then M.Is_Leaf (Model (Container), M.Root)
        and then Length (Container) = 1;
 
    procedure Insert_Child
@@ -862,10 +879,17 @@ is
        and then not M.Contains (Model (Container),
                                 M.Child (M_Path (Container, Position), Way)),
      Post   =>
-       Model (Container) =
-         M.Add (Model (Container'Old),
-                New_Item,
-                M.Child (M_Path (Container, Position), Way))
+       M.Length (Model (Container)) = M.Length (Model (Container'Old)) + 1
+       and then M.Element_Logic_Equal
+                  (M.Get (Model (Container),
+                          M.Child (M_Path (Container, Position), Way)),
+                   New_Item)
+       and then M.Elements_Equal (Model (Container'Old), Model (Container))
+       and then
+         M.Nodes_Included_Except_Subtree
+           (Left          => Model (Container),
+            Right         => Model (Container'Old),
+            Excluded_Node => M.Child (M_Path (Container'Old, Position), Way))
 
        and then Length (Container) = Length (Container'Old) + 1
        and then Has_Element (Container, Child (Container, Position, Way))
@@ -894,11 +918,19 @@ is
      Pre    => Has_Element (Container, Position)
                and then Length (Container) < Count_Type'Last,
      Post   =>
-       Model (Container) =
-         M.Add_Parent (Model (Container'Old),
-                       New_Item,
-                       M_Path (Container'Old, Position),
-                       Way)
+       M.Contains (Model (Container), M_Path (Container'Old, Position))
+       and then M.Element_Logic_Equal
+                  (New_Item,
+                   M.Get (Model (Container), M_Path (Container'Old, Position)))
+       and then M.Subtree_Elements_Shifted
+                  (Left         => Model (Container'Old),
+                   Right        => Model (Container),
+                   Subtree_Root => M_Path (Container'Old, Position),
+                   Way          => Way)
+       and then M.Elements_Equal_Except_Subtree
+                  (Model (Container'Old),
+                   Model (Container),
+                   M_Path (Container'Old, Position))
 
        and then Length (Container) = Length (Container'Old) + 1
 
@@ -930,12 +962,13 @@ is
                    Right    => Container,
                    Position => Position)
 
-       and then
-         Subtree_Mapping_Shifted
-           (Left         => Container'Old,
-            Right        => Container,
-            Subtree_Root => M_Path (Container'Old, Position),
-            Way          => Way);
+       and then Subtree_Mapping_Shifted
+                  (Left         => Container'Old,
+                   Right        => Container,
+                   Subtree_Root => M_Path (Container'Old, Position),
+                   Way          => Way)
+
+       and then Ancestry_Preserved (Container'Old, Container);
    --  Insert a new item as a parent of the node at the specified Position.
    --
    --  For example, adding node F as the parent of C changes the tree as

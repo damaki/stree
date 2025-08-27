@@ -79,6 +79,9 @@ is
       is
         (True);
 
+      function Ancestry_Preserved (Left, Right : Tree) return Boolean is
+        (True);
+
       -----------
       -- Paths --
       -----------
