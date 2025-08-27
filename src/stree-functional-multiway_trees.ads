@@ -273,6 +273,8 @@ is
      (Path  : Path_Type;
       After : SPARK.Big_Integers.Big_Natural;
       Value : Way_Type) return Path_Type
+   --  Insert an element in a path
+
    with
      Global => null,
      Pre    => After <= Length (Path),
@@ -289,6 +291,8 @@ is
    function Remove
      (Path  : Path_Type;
       Index : SPARK.Big_Integers.Big_Positive) return Path_Type
+   --  Remove one element from a path
+
    with
      Global => null,
      Pre    => Index <= Length (Path),
@@ -386,6 +390,7 @@ is
       P1, P2    : Path_Type)
    --  If a tree contains P1, and P2 is equivalent to P1, then the tree
    --  contains P2.
+
    with
      Ghost,
      Global   => null,

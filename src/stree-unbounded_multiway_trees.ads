@@ -201,6 +201,9 @@ is
       function M_Path
         (Container : Tree;
          Position  : Cursor) return M.Path_Type
+      --  Get the path in the formal model that corresponds to the specified
+      --  cursor.
+
       with
         Ghost,
         Global   => null,
@@ -211,6 +214,9 @@ is
       function M_Cursor
         (Container : Tree;
          Node      : M.Path_Type) return Cursor
+      --  Get the cursor that corresponds to the specified path in the formal
+      --  model.
+
       with
         Global => null,
         Pre    => M.Contains (Model (Container), Node),
@@ -218,6 +224,9 @@ is
                   and then M_Path (Container, M_Cursor'Result) = Node;
 
       function Mapping_Preserved (Left, Right : Tree) return Boolean with
+      --  Returns True if, for all cursors of Left, the bidirectional mapping
+      --  of cursors to paths is the same in Left and Right.
+
         Ghost,
         Global => null,
         Post   =>
@@ -240,6 +249,10 @@ is
       function Mapping_Preserved_Except_Subtree
         (Left, Right : Tree;
          Position    : Cursor) return Boolean
+      --  Returns True if, for all cursors of Left, the bidirectional mapping
+      --  of cursors to paths is the same in Left and Right, except for cursors
+      --  of Left that are in the subtree rooted at Position.
+
       with
         Ghost,
         Global => null,
@@ -271,6 +284,18 @@ is
         (Left, Right  : Tree;
          Subtree_Root : M.Path_Type;
          Way          : Way_Type) return Boolean
+      --  Returns True if all cursors of Left that are in the subtree rooted at
+      --  Subtree_Root are shifted down by one position, specified by Way.
+      --
+      --  For example, given:
+      --   * a binary tree with ways L and R;
+      --   * Subtree_Root = [L, L, L]; and
+      --   * Way = R.
+      --
+      --  then the path to the subtree is remapped to [L, L, L, R] so that an
+      --  arbitrary cursor in the subtree, e.g. previously mapping to
+      --  [L, L, L, L, L], is remapped to [L, L, L, R, L, L].
+
       with
         Ghost,
         Global => null,
@@ -304,6 +329,16 @@ is
         (Left, Right : Tree;
          Old_Subtree : M.Path_Type;
          New_Subtree : M.Path_Type) return Boolean
+      --  Returns True if all cursors of Left that are in the subtree rooted at
+      --  Old_Subtree are remapped to the same position with New_Subtree.
+      --
+      --  For example, given:
+      --   * a binary tree with ways L and R;
+      --   * Old_Subtree = [L, L, L]; and
+      --   * New_Subtree = [R, R, R].
+      --
+      --
+
       with
         Ghost,
         Global => null,
