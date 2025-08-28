@@ -7,6 +7,13 @@ package body Stree.Unbounded_Multiway_Trees with
   SPARK_Mode => Off
 is
 
+   function Get_Path
+     (Container : Node_Vectors.Vector;
+      Node      : Index_Type) return M.Path_Type
+   with
+     Ghost;
+   --  Get the path to a node
+
    function Last_In_Subtree
      (Container    : Tree;
       Subtree_Root : Cursor)
@@ -87,7 +94,19 @@ is
       -----------
 
       function Paths (Container : Tree) return P.Map is
-        (P.Empty_Map);
+         Result : P.Map := P.Empty_Map;
+      begin
+         for I in 1 .. Node_Vectors.Length (Container.Nodes) loop
+            if not Node_Vectors.Constant_Reference (Container.Nodes, I).Free
+            then
+               Result := P.Add (Result,
+                                Cursor'(Node => I),
+                                Get_Path (Container.Nodes, I));
+            end if;
+         end loop;
+
+         return Result;
+      end Paths;
 
       -----------
       -- Model --
@@ -986,5 +1005,29 @@ is
       Container.Free_List                := Node;
       Container.Length                   := Container.Length - 1;
    end Add_To_Free_List_Recursive;
+
+   --------------
+   -- Get_Path --
+   --------------
+
+   function Get_Path
+     (Container : Node_Vectors.Vector;
+      Node      : Index_Type) return M.Path_Type
+   is
+      Result : M.Path_Type;
+
+   begin
+      while Node /= 0 loop
+         declare
+            Node_Acc : constant access constant Node_Type :=
+                         Node_Vectors.Constant_Reference (Container, Node)
+                         .Element;
+         begin
+            Result := M.Insert (Result, 0, Node_Acc.all.Position);
+         end;
+      end loop;
+
+      return Result;
+   end Get_Path;
 
 end Stree.Unbounded_Multiway_Trees;
