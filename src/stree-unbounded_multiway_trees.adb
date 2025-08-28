@@ -126,7 +126,11 @@ is
          Position  : Cursor) return M.Path_Type
       is
       begin
-         return M.Root; --  TODO
+         if not Has_Element (Container, Position) then
+            raise Constraint_Error;
+         end if;
+
+         return Get_Path (Container.Nodes, Position.Node);
       end M_Path;
 
       function M_Cursor
