@@ -889,25 +889,7 @@ is
       After : SPARK.Big_Integers.Big_Natural;
       Value : Way_Type) return Path_Type
    is
-      Result : Path_Type := Root;
-      I      : SPARK.Big_Integers.Big_Natural := 0;
-
-   begin
-      while I < Length (Path) loop
-         if I = After then
-            Result.Seq := WS.Add (Result.Seq, Value);
-         end if;
-
-         I          := I + 1;
-         Result.Seq := WS.Add (Result.Seq, Get (Path, I));
-      end loop;
-
-      if I = After then
-         Result.Seq := WS.Add (Result.Seq, Value);
-      end if;
-
-      return Result;
-   end Insert;
+     (Path_Type'(Seq => WS.Add (Path.Seq, After + 1, Value)));
 
    --------------
    -- Is_Empty --
