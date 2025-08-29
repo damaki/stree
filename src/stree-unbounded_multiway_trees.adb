@@ -14,6 +14,16 @@ is
      Ghost;
    --  Get the path to a node
 
+   function Same_Path
+     (Left, Right : Tree;
+      L_Position : Cursor;
+      R_Position : Cursor) return Boolean
+   with
+     Pre => Has_Element (Left, L_Position)
+            and then Has_Element (Right, R_Position);
+   --  Returns True if the path to nodes L_Position and R_Position are the same
+   --  in trees Left and Right respectively.
+
    function Last_In_Subtree
      (Container    : Tree;
       Subtree_Root : Cursor)
@@ -50,7 +60,30 @@ is
       -----------------------
 
       function Mapping_Preserved (Left, Right : Tree) return Boolean is
+         L, R : Cursor;
       begin
+         for I in 1 .. Node_Vectors.Last_Index (Left.Nodes) loop
+            L := Cursor'(Node => I);
+            R := L;
+
+            --  Skip over freed nodes
+
+            if Has_Element (Left, L) then
+
+               --  Check that the same cursor exists in Right.
+
+               if not Has_Element (Right, R) then
+                  return False;
+               end if;
+
+               --  Check that both nodes have the same path
+
+               if not Same_Path (Left, Right, L, R) then
+                  return False;
+               end if;
+            end if;
+         end loop;
+
          return True;
       end Mapping_Preserved;
 
@@ -1027,5 +1060,59 @@ is
 
       return Result;
    end Get_Path;
+
+   ---------------
+   -- Same_Path --
+   ---------------
+
+   function Same_Path
+     (Left, Right : Tree;
+      L_Position : Cursor;
+      R_Position : Cursor) return Boolean
+   is
+      L : Cursor := L_Position;
+      R : Cursor := R_Position;
+
+   begin
+
+      --  Walk up both trees, starting and L and R in Left and Right
+      --  respectively, checking that the path to the node from their
+      --  parents are the same at each step.
+
+      while L /= No_Element loop
+
+         --  Check if R hit the root before L
+
+         if R = No_Element then
+            return False;
+         end if;
+
+         declare
+            L_Acc : constant not null access constant Node_Type :=
+                        Node_Vectors.Constant_Reference
+                          (Left.Nodes, L.Node).Element;
+            R_Acc : constant not null access constant Node_Type :=
+                        Node_Vectors.Constant_Reference
+                          (Right.Nodes, R.Node).Element;
+         begin
+            --  Check that both nodes have the same position w.r.t
+            --  their parent.
+
+            if L_Acc.all.Position /= R_Acc.all.Position then
+               return False;
+            end if;
+
+            --  Go up and check the parent
+
+            L := L_Acc.all.Parent;
+            R := R_Acc.all.Parent;
+         end;
+      end loop;
+
+      --  L and R should both have hit the root at the same time if they have
+      --  the same path.
+
+      return R = No_Element;
+   end Same_Path;
 
 end Stree.Unbounded_Multiway_Trees;
