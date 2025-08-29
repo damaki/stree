@@ -168,9 +168,8 @@ is
       --  directions (ways) taken at each node along the path.
       --
       --  To model cursors we define a mapping between cursors and paths.
-      --  The mapping is bijective, i.e. each valid cursor maps to a unique
-      --  path in the formal model, and the path of each node in the formal
-      --  model's tree maps to a unique cursor.
+      --  The mapping is injective, i.e. each valid cursor maps to a distinct
+      --  path in the formal model.
 
       package P is new SPARK.Containers.Functional.Maps
         (Key_Type     => Cursor,
@@ -224,18 +223,6 @@ is
         Post     => M_Path'Result = P.Get (Paths (Container), Position),
         Annotate => (GNATprove, Inline_For_Proof);
 
-      function M_Cursor
-        (Container : Tree;
-         Node      : M.Path_Type) return Cursor
-      --  Get the cursor that corresponds to the specified path in the formal
-      --  model.
-
-      with
-        Global => null,
-        Pre    => M.Contains (Model (Container), Node),
-        Post   => P.Has_Key (Paths (Container), M_Cursor'Result)
-                  and then M_Path (Container, M_Cursor'Result) = Node;
-
       function Mapping_Preserved (Left, Right : Tree) return Boolean with
       --  Returns True if, for all cursors of Left, the bidirectional mapping
       --  of cursors to paths is the same in Left and Right.
@@ -251,13 +238,7 @@ is
              --  the same.
              and then
                (for all C of Paths (Left) =>
-                  M_Path (Left, C) = M_Path (Right, C))
-
-             --  Mappings from paths to cursors induced by Left and Right are
-             --  the same.
-             and then
-               (for all Path of Model (Left) =>
-                  M_Cursor (Left, Path) = M_Cursor (Right, Path)));
+                  M_Path (Left, C) = M_Path (Right, C)));
 
       function Mapping_Preserved_Except_Subtree
         (Left, Right : Tree;
@@ -284,14 +265,7 @@ is
                (for all C of Paths (Left) =>
                   (if not M.In_Subtree (M_Path (Left, C),
                                         M_Path (Left, Position))
-                   then M_Path (Left, C) = M_Path (Right, C)))
-
-             --  Mappings from paths to cursors induced by Left and Right are
-             --  the same, except for nodes in the subtree rooted at Position.
-             and then
-               (for all Path of Model (Left) =>
-                  (if not M.In_Subtree (Path, M_Path (Left, Position)) then
-                     M_Cursor (Left, Path) = M_Cursor (Right, Path))));
+                   then M_Path (Left, C) = M_Path (Right, C))));
 
       function Subtree_Mapping_Shifted
         (Left, Right  : Tree;
@@ -326,17 +300,7 @@ is
                    then M_Path (Right, C) =
                           M.Insert (Path  => M_Path (Left, C),
                                     After => M.Length (Subtree_Root),
-                                    Value => Way)))
-
-             and then
-               (for all Path of Model (Left) =>
-                  (if M.In_Subtree (Path, Subtree_Root) then
-                     M_Cursor (Right,
-                               M.Insert
-                                 (Path  => Path,
-                                  After => M.Length (Subtree_Root),
-                                  Value => Way))
-                     = M_Cursor (Left, Path))));
+                                    Value => Way))));
 
       function Subtree_Remapped
         (Left, Right : Tree;
@@ -371,16 +335,7 @@ is
                   (if M.In_Subtree (M_Path (Left, C), Old_Subtree) then
                      M_Path (Right, C) =
                        M.Splice_Path
-                         (Old_Subtree, M_Path (Left, C), New_Subtree)))
-
-             --  Paths in New_Subtree of Right map to the same cursors as the
-             --  corresponding nodes in the Old_Subtree of Left.
-             and then
-               (for all Path of Model (Left) =>
-                  (if M.In_Subtree (Path, Old_Subtree) then
-                     M_Cursor (Right,
-                               M.Splice_Path (Old_Subtree, Path, New_Subtree))
-                     = M_Cursor (Left, Path))));
+                         (Old_Subtree, M_Path (Left, C), New_Subtree))));
 
       function Same_Mapping_Except
         (Left, Right : Tree;
@@ -404,13 +359,7 @@ is
              and then
                (for all C of Paths (Left) =>
                   (if C /= Position then
-                     M_Path (Left, C) = M_Path (Right, C)))
-
-             --  Mappings from paths to cursors are the same
-             and then
-               (for all Path of Model (Left) =>
-                  (if M_Cursor (Left, Path) /= Position then
-                     M_Cursor (Left, Path) = M_Cursor (Right, Path))));
+                     M_Path (Left, C) = M_Path (Right, C))));
 
       function Same_Mapping_Except_Subtree
         (Left, Right : Tree;
@@ -437,13 +386,7 @@ is
                (for all C of Paths (Left) =>
                   (if not M.In_Subtree
                            (M_Path (Left, C), M_Path (Left, Position))
-                   then M_Path (Left, C) = M_Path (Right, C)))
-
-             --  Mappings from paths to cursors are the same
-             and then
-               (for all Path of Model (Right) =>
-                  (if not M.In_Subtree (Path, M_Path (Left, Position))
-                   then M_Cursor (Left, Path) = M_Cursor (Right, Path))));
+                   then M_Path (Left, C) = M_Path (Right, C))));
 
       function Ancestry_Preserved (Left, Right : Tree) return Boolean with
         Ghost,
@@ -938,8 +881,6 @@ is
 
        and then M_Path (Container, Parent (Container, Position)) =
                 M_Path (Container'Old, Position)
-       and then M_Cursor (Container, M_Path (Container'Old, Position)) =
-                Parent (Container, Position)
 
        and then
          (if Root (Container'Old) = Position

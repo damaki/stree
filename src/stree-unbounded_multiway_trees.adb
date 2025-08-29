@@ -133,32 +133,6 @@ is
          return Get_Path (Container.Nodes, Position.Node);
       end M_Path;
 
-      --------------
-      -- M_Cursor --
-      --------------
-
-      function M_Cursor
-        (Container : Tree;
-         Node      : M.Path_Type) return Cursor
-      is
-         C   : Cursor                         := Container.Root;
-         I   : SPARK.Big_Integers.Big_Integer := 1;
-         Way : Way_Type;
-      begin
-         while C /= No_Element and then I <= M.Length (Node) loop
-            declare
-               Node_Acc : constant access constant Node_Type :=
-                            Node_Vectors.Constant_Reference
-                              (Container.Nodes, C.Node).Element;
-            begin
-               C := Node_Acc.all.Ways (M.Get (Node, I));
-               I := I + 1;
-            end;
-         end loop;
-
-         return C;
-      end M_Cursor;
-
    end Formal_Model;
 
    ----------------
