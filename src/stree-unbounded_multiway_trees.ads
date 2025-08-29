@@ -687,12 +687,16 @@ is
    with
      Inline,
      Global => null,
-     Pre    => Has_Element (Container, Position),
-     Post   => (if Position = Root (Container)
-                then Parent'Result = No_Element
-                else Has_Element (Container, Parent'Result)
-                     and then M_Path (Container, Parent'Result) =
-                                M.Parent (M_Path (Container, Position)));
+     Post   =>
+       ((Parent'Result = No_Element) =
+          (not Has_Element (Container, Position)
+           or else Is_Root (Container, Position)))
+
+       and then
+         (if Parent'Result /= No_Element
+          then Has_Element (Container, Parent'Result)
+               and then M_Path (Container, Parent'Result) =
+                          M.Parent (M_Path (Container, Position)));
    --  Get a cursor to the parent of a node
 
    function Child
@@ -703,11 +707,12 @@ is
    with
      Inline,
      Global => null,
-     Pre    => Has_Element (Container, Position),
      Post   =>
        ((Child'Result = No_Element) =
-          not M.Contains (Model (Container),
-                          M.Child (M_Path (Container, Position), Way)))
+          (not Has_Element (Container, Position)
+           or else
+             not M.Contains (Model (Container),
+                             M.Child (M_Path (Container, Position), Way))))
 
        and then
          (if Child'Result /= No_Element then
