@@ -87,11 +87,42 @@ is
          return True;
       end Mapping_Preserved;
 
+      --------------------------------------
+      -- Mapping_Preserved_Except_Subtree --
+      --------------------------------------
+
       function Mapping_Preserved_Except_Subtree
         (Left, Right : Tree;
          Position    : Cursor) return Boolean
       is
-        (True);
+         L, R : Cursor;
+      begin
+         for I in 1 .. Node_Vectors.Last_Index (Left.Nodes) loop
+            L := Cursor'(Node => I);
+            R := L;
+
+            --  Skip over freed nodes, and nodes in the specified subtree
+
+            if Has_Element (Left, L)
+               and then not In_Subtree (Left, Position, L)
+            then
+
+               --  Check that the same cursor exists in Right.
+
+               if not Has_Element (Right, R) then
+                  return False;
+               end if;
+
+               --  Check that both nodes have the same path
+
+               if not Same_Path (Left, Right, L, R) then
+                  return False;
+               end if;
+            end if;
+         end loop;
+
+         return True;
+      end Mapping_Preserved_Except_Subtree;
 
       function Same_Mapping_Except
         (Left, Right : Tree;
