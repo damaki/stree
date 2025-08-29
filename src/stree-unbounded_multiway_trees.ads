@@ -224,8 +224,8 @@ is
         Annotate => (GNATprove, Inline_For_Proof);
 
       function Mapping_Preserved (Left, Right : Tree) return Boolean with
-      --  Returns True if, for all cursors of Left, the bidirectional mapping
-      --  of cursors to paths is the same in Left and Right.
+      --  Returns True if, for all cursors of Left, the mapping of cursors to
+      --  paths is the same in Left and Right.
 
         Ghost,
         Global => null,
@@ -243,9 +243,9 @@ is
       function Mapping_Preserved_Except_Subtree
         (Left, Right : Tree;
          Position    : Cursor) return Boolean
-      --  Returns True if, for all cursors of Left, the bidirectional mapping
-      --  of cursors to paths is the same in Left and Right, except for cursors
-      --  of Left that are in the subtree rooted at Position.
+      --  Returns True if, for all cursors of Left, the mapping of cursors to
+      --  paths is the same in Left and Right, except for cursors of Left that
+      --  are in the subtree rooted at Position.
 
       with
         Ghost,
@@ -340,8 +340,8 @@ is
       function Same_Mapping_Except
         (Left, Right : Tree;
          Position    : Cursor) return Boolean
-      --  Returns true if the bidirectional mapping of cursors to paths is
-      --  the same in Left and Right, except for the node at Position.
+      --  Returns true if the mapping of cursors to paths is the same in Left
+      --  and Right, except for the node at Position.
 
       with
         Ghost,
