@@ -284,8 +284,8 @@ is
                and then Range_Shifted
                           (Left   => Path,
                            Right  => Insert'Result,
-                           Fst    => After + 2,
-                           Lst    => Length (Path) + 1,
+                           Fst    => After + 1,
+                           Lst    => Length (Path),
                            Offset => 1);
 
    function Remove
