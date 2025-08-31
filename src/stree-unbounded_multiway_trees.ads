@@ -30,9 +30,6 @@ private with Ada.Containers.Vectors;
 --  be iterated over using iterator loops. "for .. in" loops iterate over
 --  cursors, and "for .. of" loops iterate over elements.
 --
---  Reverse iteration is also possible using the functions Last, Prev, and
---  Has_Element.
---
 --  Quantification over trees is also available using "for all" and "for some".
 
 generic
@@ -827,30 +824,40 @@ is
        and then not M.Contains (Model (Container),
                                 M.Child (M_Path (Container, Position), Way)),
      Post   =>
-       M.Length (Model (Container)) = M.Length (Model (Container'Old)) + 1
+       --  One new node has been added to the tree
+       Length (Container) = Length (Container'Old) + 1
+
+       --  The element at the new node is equivalent to New_Item
        and then M.Element_Logic_Equal
                   (M.Get (Model (Container),
                           M.Child (M_Path (Container, Position), Way)),
                    New_Item)
+       and then
+         Equivalent_Elements
+           (New_Item,
+            Element (Container, Child (Container, Position, Way)))
+
+       --  All previous elements are unchanged in the formal model
        and then M.Elements_Equal (Model (Container'Old), Model (Container))
+
        and then
          M.Nodes_Included_Except_Subtree
            (Left          => Model (Container),
             Right         => Model (Container'Old),
             Excluded_Node => M.Child (M_Path (Container'Old, Position), Way))
 
-       and then Length (Container) = Length (Container'Old) + 1
+       --  The node at Position now has a child at the specified Way
        and then Has_Element (Container, Child (Container, Position, Way))
+
+       --  The new child has no children of its own
        and then Is_Leaf (Container, Child (Container, Position, Way))
+
+       --  The root of the tree is unchanged
        and then Root (Container) = Root (Container'Old)
 
-       and then
-         Equivalent_Elements
-           (New_Item,
-            Element (Container, Child (Container, Position, Way)))
-
-       and then M.Elements_Equal (Model (Container'Old), Model (Container))
-
+       --  The mappings of all previous valid cursors to paths in the formal
+       --  model is the same as before, except for the addition of the new
+       --  child node.
        and then Same_Mapping_Except
                   (Left     => Container'Old,
                    Right    => Container,
@@ -866,54 +873,70 @@ is
      Pre    => Has_Element (Container, Position)
                and then Length (Container) < Count_Type'Last,
      Post   =>
-       M.Contains (Model (Container), M_Path (Container'Old, Position))
-       and then M.Element_Logic_Equal
-                  (New_Item,
-                   M.Get (Model (Container), M_Path (Container'Old, Position)))
-       and then M.Subtree_Elements_Shifted
-                  (Left         => Model (Container'Old),
-                   Right        => Model (Container),
-                   Subtree_Root => M_Path (Container'Old, Position),
-                   Way          => Way)
-       and then M.Elements_Equal_Except_Subtree
-                  (Model (Container'Old),
-                   Model (Container),
-                   M_Path (Container'Old, Position))
+       --  One new node has been added to the tree
+       Length (Container) = Length (Container'Old) + 1
 
-       and then Length (Container) = Length (Container'Old) + 1
-
+       --  The new node is inserted as the parent of the node at Position
        and then Has_Element (Container, Parent (Container, Position))
-
        and then M_Path (Container, Parent (Container, Position)) =
                 M_Path (Container'Old, Position)
 
-       and then
-         (if Root (Container'Old) = Position
-          then Root (Container) = Parent (Container, Position)
-          else Root (Container) = Root (Container'Old))
-
+       --  The element at the new node is equivalent to New_Item
+       and then M.Element_Logic_Equal
+                  (New_Item,
+                   M.Get (Model (Container), M_Path (Container'Old, Position)))
        and then
          Equivalent_Elements
            (New_Item,
             Element (Container, Parent (Container, Position)))
 
+       --  All previous nodes and elements not in the affected subtree are
+       --  unchanged.
+       and then M.Elements_Equal_Except_Subtree
+                  (Model (Container'Old),
+                   Model (Container),
+                   M_Path (Container'Old, Position))
+
+       --  The position of elements in the affected subtree is shifted by
+       --  the insertion of the new parent node.
+       and then M.Subtree_Elements_Shifted
+                  (Left         => Model (Container'Old),
+                   Right        => Model (Container),
+                   Subtree_Root => M_Path (Container'Old, Position),
+                   Way          => Way)
+
+       --  The root of the tree is unchanged, unless the node at Position was
+       --  the root in which case the new parent node becomes the root.
+       and then
+         (if Root (Container'Old) = Position
+          then Root (Container) = Parent (Container, Position)
+          else Root (Container) = Root (Container'Old))
+
+       --  All cursors are preserved, except for the insertion of a new cursor
+       --  that references the new parent.
        and then P.Keys_Included (Paths (Container'Old), Paths (Container))
        and then P.Keys_Included_Except
                   (Paths (Container),
                    Paths (Container'Old),
                    Parent (Container, Position))
 
+       --  The mapping of cursors to paths in the formal model is preserved
+       --  for all nodes that are not in the affected subtree
        and then Mapping_Preserved_Except_Subtree
                   (Left     => Container'Old,
                    Right    => Container,
                    Position => Position)
 
+       --  Cursors in the affected subtree are remapped to new paths in the
+       --  formal model as a result of the insertion of the new parent node.
        and then Subtree_Mapping_Shifted
                   (Left         => Container'Old,
                    Right        => Container,
                    Subtree_Root => M_Path (Container'Old, Position),
                    Way          => Way)
 
+       --  Nodes that were ancestors of other nodes are still their ancestors
+       --  in the updated tree.
        and then Ancestry_Preserved (Container'Old, Container);
    --  Insert a new item as a parent of the node at the specified Position.
    --
@@ -934,22 +957,29 @@ is
      Global => null,
      Pre    => Has_Element (Container, Position),
      Post   =>
-       Model (Container) =
-         M.Remove (Model (Container'Old), M_Path (Container'Old, Position))
+       --  The length of the container has decreased
+       Length (Container) < Length (Container'Old)
 
-       and then Length (Container) < Length (Container'Old)
+       and then
+         Model (Container) =
+           M.Remove (Model (Container'Old), M_Path (Container'Old, Position))
 
+       --  The referenced node is now deleted
        and then not Has_Element (Container, Position)
+
+       --  If the root was deleted then the tree is now empty. Otherwise, the
+       --  root is preserved.
        and then (if Position = Root (Container'Old)
                  then Is_Empty (Container)
                  else Root (Container) = Root (Container'Old))
 
+       --  The mapping of cursors to paths in the formal model is the same,
+       --  except for the deleted subtree.
+       and then Mapping_Preserved (Container, Container'Old)
        and then Same_Mapping_Except_Subtree
                   (Left     => Container'Old,
                    Right    => Container,
-                   Position => Position)
-
-       and then Mapping_Preserved (Container, Container'Old);
+                   Position => Position);
    --  Delete a node from the tree.
    --
    --  If the node has any child nodes then they are also deleted.
@@ -1001,7 +1031,6 @@ is
                            M_Path (Container.all, Position))
 
                --  Mapping from cursors to Model nodes is preserved
-
                and then Mapping_Preserved
                           (Left  => Container.all,
                            Right => Container.all'Old)

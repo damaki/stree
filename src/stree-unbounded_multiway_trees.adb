@@ -271,6 +271,7 @@ is
       -----------
 
       function Model (Container : Tree) return M.Tree is
+         pragma Unreferenced (Container);
       begin
          return M.Empty_Tree; --  TODO
       end Model;
