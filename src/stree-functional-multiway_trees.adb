@@ -486,6 +486,16 @@ is
                                         Element  =>
                                           new Element_Type'(New_Item))))))));
 
+   -------------
+   -- Element --
+   -------------
+
+   function Element
+     (Iterator : Iterable_Tree;
+      Cursor   : Tree) return Path_Type
+   is
+     (Choose (Cursor));
+
    -------------------------
    -- Element_Logic_Equal --
    -------------------------
@@ -777,11 +787,18 @@ is
       return Node;
    end Find_Node;
 
+   -----------
+   -- First --
+   -----------
+
    function First (Path : Path_Type) return SPARK.Big_Integers.Big_Integer is
       pragma Unreferenced (Path);
    begin
       return 1;
    end First;
+
+   function First (Iterator : Iterable_Tree) return Tree is
+     (Iterator.Container);
 
    ----------------
    -- First_Node --
@@ -879,6 +896,23 @@ is
 
       return Node.all.Element.Ref.Element.all;
    end Get;
+
+   --------------
+   -- Get_Tree --
+   --------------
+
+   function Get_Tree (Iterator : Iterable_Tree) return Tree is
+     (Iterator.Container);
+
+   -----------------
+   -- Has_Element --
+   -----------------
+
+   function Has_Element
+     (Iterator : Iterable_Tree;
+      Cursor   : Tree) return Boolean
+   is
+     (Valid_Subtree (Iterator, Cursor) and then not Is_Empty (Cursor));
 
    ------------
    -- Insert --
@@ -993,6 +1027,13 @@ is
       end if;
    end Iter_Next;
 
+   -------------
+   -- Iterate --
+   -------------
+
+   function Iterate (Container : Tree) return Iterable_Tree is
+     (Iterable_Tree'(Container => Container));
+
    -------------------------------
    -- Lemma_Ancestor_Transitive --
    -------------------------------
@@ -1094,6 +1135,9 @@ is
    begin
       return Position + 1;
    end Next;
+
+   function Next (Iterator : Iterable_Tree; Cursor : Tree) return Tree is
+     (Remove (Cursor, Choose (Cursor)));
 
    ---------------
    -- Next_Node --
@@ -1551,5 +1595,49 @@ is
              Element_Logic_Equal
                (Get (Left, Node),
                 Get (Right, Insert (Node, Length (Subtree_Root), Way)))));
+
+   ----------------------
+   -- Tree_Logic_Equal --
+   ----------------------
+
+   function Tree_Logic_Equal (Left, Right : Tree) return Boolean is
+     (Elements_Equal (Left, Right)
+      and then Elements_Equal (Left => Right, Right => Left));
+
+   -------------------
+   -- Valid_Subtree --
+   -------------------
+
+   function Valid_Subtree
+     (Iterator : Iterable_Tree;
+      Cursor   : Tree) return Boolean
+   is
+      L, R    : Node_Access;
+      Success : Boolean;
+
+   begin
+      if Iterator.Container.Ref.Ref = null then
+         return True;
+      elsif Cursor.Ref.Ref = null then
+         return False;
+      end if;
+
+      L := Iterator.Container.Ref.Ref.all.Root_Node;
+      R := Cursor.Ref.Ref.all.Root_Node;
+
+      First_Node_In_Both (L, R, Success);
+
+      while Success and then L /= null loop
+         if L.all.Element.Ref.all.Element.all /=
+            R.all.Element.Ref.all.Element.all
+         then
+            return False;
+         end if;
+
+         Next_Node_In_Both (L, R, Success);
+      end loop;
+
+      return Success;
+   end Valid_Subtree;
 
 end Stree.Functional.Multiway_Trees;

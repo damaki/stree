@@ -673,6 +673,92 @@ is
        and then Same_Nodes (Container, Set'Result)
        and then Elements_Equal_Except (Container, Set'Result, Node);
 
+   -----------------------------------
+   -- Iteration on Functional Trees --
+   -----------------------------------
+
+   --  The Iterable aspect can be used to quantify over a functional tree.
+   --  However, if it is used to create a for loop, it will not allow users to
+   --  prove their loops as there is no way to speak about the elements which
+   --  have or have not been traversed already in a loop invariant. The
+   --  function Iterate returns an object of a type Iterable_Tree which can be
+   --  used for iteration. The cursor is a functional tree containing all the
+   --  elements which have not been traversed yet. The current element being
+   --  traversed being the result of Choose on this tree.
+
+   type Iterable_Tree is private with
+     Iterable =>
+       (First       => First,
+        Has_Element => Has_Element,
+        Next        => Next,
+        Element     => Element);
+
+   function Tree_Logic_Equal (Left, Right : Tree) return Boolean with
+     Ghost,
+     Annotate => (GNATprove, Logical_Equal);
+   --  Logical equality on trees
+
+   function Iterate (Container : Tree) return Iterable_Tree with
+     Global => null,
+     Post   => Tree_Logic_Equal (Get_Tree (Iterate'Result), Container);
+   --  Return an iterator over a functional tree
+
+   function Get_Tree (Iterator : Iterable_Tree) return Tree with
+     Global => null;
+   --  Retrieve the tree associated with an iterator
+
+   function Valid_Subtree
+     (Iterator : Iterable_Tree;
+      Cursor   : Tree) return Boolean
+   with
+     Global => null,
+     Post   =>
+         Valid_Subtree'Result = Elements_Equal (Cursor, Get_Tree (Iterator)),
+     Annotate => (GNATprove, Inline_For_Proof);
+   --  Return True on all trees which can be reached by iterating over
+   --  Container.
+
+   function Element
+     (Iterator : Iterable_Tree;
+      Cursor   : Tree) return Path_Type
+   with
+     Global => null,
+     Pre    => not Is_Empty (Cursor),
+     Post   => Element'Result = Choose (Cursor),
+     Annotate => (GNATprove, Inline_For_Proof);
+   --  The next element to be considered for the iteration is the result of
+   --  choose on Cursor.
+
+   function First (Iterator : Iterable_Tree) return Tree with
+     Global => null,
+     Post   => Tree_Logic_Equal (First'Result, Get_Tree (Iterator))
+       and then Valid_Subtree (Iterator, First'Result);
+   --  In the first iteration, the cursor is the tree associated with Iterator
+
+   function Next (Iterator : Iterable_Tree; Cursor : Tree) return Tree with
+     Global => null,
+     Pre    => Valid_Subtree (Iterator, Cursor) and then not Is_Empty (Cursor),
+     Post   =>
+       Valid_Subtree (Iterator, Next'Result)
+       and then Length (Next'Result) = Length (Cursor) - 1
+       and then not Contains (Next'Result, Choose (Cursor))
+       and then (for all C of Cursor =>
+                   (if C /= Choose (Cursor) then
+                      Contains (Next'Result, C)));
+   --  At each iteration, remove the node selected by Choose from the Cursor
+   --  tree.
+
+   function Has_Element
+     (Iterator : Iterable_Tree;
+      Cursor   : Tree) return Boolean
+   with
+     Global => null,
+     Post   => Has_Element'Result =
+       (Valid_Subtree (Iterator, Cursor) and then not Is_Empty (Cursor)),
+     Annotate => (GNATprove, Inline_For_Proof);
+   --  Return True on non-empty trees which can be reached by iterating over
+   --  Container.
+
    -------------------------------------------------------------------------
    -- Ghost non-executable properties used only in internal specification --
    -------------------------------------------------------------------------
@@ -966,6 +1052,10 @@ private
 
    type Tree is record
       Ref : Controlled_Tree_Access;
+   end record;
+
+   type Iterable_Tree is record
+      Container : Tree;
    end record;
 
    type Private_Path is record
