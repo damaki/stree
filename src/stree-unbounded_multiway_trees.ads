@@ -426,9 +426,9 @@ is
      Global => null,
      Pre    => Has_Element (Container, Position),
      Post   =>
-       Element_Logic_Equal
-         (Element'Result,
-          M.Get (Model (Container), M_Path (Container, Position)));
+       Element'Result = M.Get (Model (Container),
+                               M_Path (Container, Position)),
+     Annotate => (GNATprove, Inline_For_Proof);
    --  Get the element at the specified position in the tree
 
    procedure Replace_Element
@@ -804,12 +804,12 @@ is
      Global => null,
      Pre    => Is_Empty (Container),
      Post   =>
-       M.Length (Model (Container)) = 1
+       Length (Container) = 1
        and then M.Contains (Model (Container), M.Root)
        and then M.Element_Logic_Equal
-                  (M.Get (Model (Container), M.Root), New_Item)
-       and then M.Is_Leaf (Model (Container), M.Root)
-       and then Length (Container) = 1;
+                  (M.Get (Model (Container), M.Root),
+                   M.Copy_Element (New_Item))
+       and then M.Is_Leaf (Model (Container), M.Root);
 
    procedure Insert_Child
      (Container : in out Tree;
@@ -831,7 +831,7 @@ is
        and then M.Element_Logic_Equal
                   (M.Get (Model (Container),
                           M.Child (M_Path (Container, Position), Way)),
-                   New_Item)
+                   M.Copy_Element (New_Item))
        and then
          Equivalent_Elements
            (New_Item,
@@ -883,7 +883,7 @@ is
 
        --  The element at the new node is equivalent to New_Item
        and then M.Element_Logic_Equal
-                  (New_Item,
+                  (M.Copy_Element (New_Item),
                    M.Get (Model (Container), M_Path (Container'Old, Position)))
        and then
          Equivalent_Elements
