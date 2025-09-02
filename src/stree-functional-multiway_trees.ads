@@ -1108,12 +1108,13 @@ private
       Success :    out Boolean)
    with
      Pre => Left /= null and then Right /= null;
-   --  Get the first node in the iteration in the Left tree, while checking
-   --  that the same path exists in Right.
+   --  Get the first node in the iteration in the Left tree, following the same
+   --  path in Right.
    --
-   --  Success is returned if the path to the first node in the iterations
-   --  of Left and Right result in the same node, and both nodes are leaf
-   --  nodes. Otherwise, False is returned.
+   --  Left and Right are updated to point to the nodes that were found.
+   --
+   --  Success is True if the same node found in Left also exists in Right.
+   --  Otherwise, it is set to False.
 
    procedure First_Node_In_Both_Except
      (Left          : in out Node_Access;
@@ -1123,6 +1124,14 @@ private
    with
      Pre  => Left /= null and then Right /= null,
      Post => (if Excluded_Node /= null then Left /= Excluded_Node);
+   --  Get the first node in the iteration in the Left tree, skipping over the
+   --  Excluded_Node if encountered in Left. The same path is followed in
+   --  Right.
+   --
+   --  Left and Right are updated to point to the first nodes in each tree.
+   --
+   --  Success is True if the same node found in Left also exists in Right.
+   --  Otherwise, it is set to False.
 
    procedure Next_Node_In_Both
      (Left  : in out Node_Access;
@@ -1130,6 +1139,13 @@ private
       Success :    out Boolean)
    with
      Pre => Left /= null and then Right /= null;
+   --  Get the next node in the iteration in the Left tree, following the same
+   --  path in Right.
+   --
+   --  Left and Right are updated to point to the next nodes that were found.
+   --
+   --  Success is True if the same node found in Left also exists in Right.
+   --  Otherwise, it is set to False.
 
    procedure Next_Node_In_Both_Except
      (Left          : in out Node_Access;
@@ -1139,8 +1155,16 @@ private
    with
      Pre  => Left /= null and then Right /= null,
      Post => (if Excluded_Node /= null then Left /= Excluded_Node);
+   --  Get the next node in the iteration in the Left tree, skipping over
+   --  Excluded_Node if encountered, and following the same path in Right.
+   --
+   --  Left and Right are updated to point to the next nodes that were found.
+   --
+   --  Success is True if the same node found in Left also exists in Right.
+   --  Otherwise, it is set to False.
 
    function Path_To_Node (Node : Not_Null_Node_Access) return Path_Type;
+   --  Get the path to the specified node from the root
 
    --------------------------
    -- Construction Helpers --
