@@ -78,14 +78,18 @@ package body Tree_Tests.Is_Root_Tests is
 
    procedure Add_To_Suite (S : in out Test_Suite'Class) is
    begin
-      S.Add_Test (Caller.Create ("Is_Root (No_Element)",
-                                 Test_Is_Root_No_Element'Access));
-      S.Add_Test (Caller.Create ("Is_Root (Root)",
-                                 Test_Is_Root_Root'Access));
-      S.Add_Test (Caller.Create ("Is_Root (Non-root)",
-                                 Test_Is_Root_Non_Root'Access));
-      S.Add_Test (Caller.Create ("Is_Root (Invalid cursor)",
-                                 Test_Is_Root_Invalid_Cursor'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Is_Root (No_Element)",
+                     Test_Is_Root_No_Element'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Is_Root (Root)",
+                     Test_Is_Root_Root'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Is_Root (Non-root)",
+                     Test_Is_Root_Non_Root'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Is_Root (Invalid cursor)",
+                     Test_Is_Root_Invalid_Cursor'Access));
    end Add_To_Suite;
 
 end Tree_Tests.Is_Root_Tests;

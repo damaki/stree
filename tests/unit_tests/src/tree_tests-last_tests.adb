@@ -45,9 +45,9 @@ package body Tree_Tests.Last_Tests is
 
    procedure Add_To_Suite (S : in out Test_Suite'Class) is
    begin
-      S.Add_Test (Caller.Create ("Last (Empty)",
+      S.Add_Test (Caller.Create ("Unbounded_Multiway_Trees.Last (Empty)",
                                  Test_Last_Empty'Access));
-      S.Add_Test (Caller.Create ("Last (Not empty)",
+      S.Add_Test (Caller.Create ("Unbounded_Multiway_Trees.Last (Not empty)",
                                  Test_Last_Not_Empty'Access));
    end Add_To_Suite;
 

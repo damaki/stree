@@ -103,12 +103,15 @@ package body Tree_Tests.Prev_Tests is
 
    procedure Add_To_Suite (S : in out Test_Suite'Class) is
    begin
-      S.Add_Test (Caller.Create ("Prev (No_Element)",
-                                 Test_Prev_No_Element'Access));
-      S.Add_Test (Caller.Create ("Prev (Invalid cursor)",
-                                 Test_Prev_Invalid_Cursor'Access));
-      S.Add_Test (Caller.Create ("Prev (Valid tree)",
-                                 Test_Prev_Valid_Tree'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Prev (No_Element)",
+                     Test_Prev_No_Element'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Prev (Invalid cursor)",
+                     Test_Prev_Invalid_Cursor'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Prev (Valid tree)",
+                     Test_Prev_Valid_Tree'Access));
    end Add_To_Suite;
 
 end Tree_Tests.Prev_Tests;

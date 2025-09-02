@@ -3,11 +3,26 @@
 --
 --  SPDX-License-Identifier: Apache-2.0
 --
-with SPARK.Containers.Functional.Sets;
-
 package body Stree.Unbounded_Multiway_Trees with
   SPARK_Mode => Off
 is
+
+   function Get_Path
+     (Container : Node_Vectors.Vector;
+      Node      : Index_Type) return M.Path_Type
+   with
+     Ghost;
+   --  Get the path to a node
+
+   function Same_Path
+     (Left, Right : Tree;
+      L_Position : Cursor;
+      R_Position : Cursor) return Boolean
+   with
+     Pre => Has_Element (Left, L_Position)
+            and then Has_Element (Right, R_Position);
+   --  Returns True if the path to nodes L_Position and R_Position are the same
+   --  in trees Left and Right respectively.
 
    function Last_In_Subtree
      (Container    : Tree;
@@ -27,61 +42,255 @@ is
       Node      :        Cursor);
    --  Add a node (and its children) to the free list
 
+   ------------------
+   -- Formal_Model --
+   ------------------
+
    package body Formal_Model is
 
-      package Cursor_Sets is new SPARK.Containers.Functional.Sets
-        (Element_Type => Cursor);
+      -------------------------
+      -- Element_Logic_Equal --
+      -------------------------
 
-      function Model (Container : Tree) return Model_Type is
-         use Node_Vectors;
-         use Cursor_Sets;
+      function Element_Logic_Equal (Left, Right : Element_Type) return Boolean
+      is (Left = Right);
 
-         Todo : Cursor_Sets.Set;
-         C    : Cursor;
-         N    : Node_Type;
+      -----------------------
+      -- Mapping_Preserved --
+      -----------------------
 
-         M : Model_Type :=
-           [others => (Path     => Way_Sequences.Empty_Sequence,
-                       Parent   => No_Element,
-                       Way      => Way_Type'First,
-                       Children => [others => No_Element],
-                       In_Tree  => False)];
-
+      function Mapping_Preserved (Left, Right : Tree) return Boolean is
+         L, R : Cursor;
       begin
-         if not Is_Empty (Container) then
-            Todo := [Container.Root];
+         for I in 1 .. Node_Vectors.Last_Index (Left.Nodes) loop
+            L := Cursor'(Node => I);
+            R := L;
 
-            M (Container.Root.Node) :=
-              (Path     => Way_Sequences.Empty_Sequence,
-               Parent   => No_Element,
-               Way      => Way_Type'First,
-               In_Tree  => True,
-               Children =>
-                 Element (Container.Nodes, Root (Container).Node).Ways);
+            --  Skip over freed nodes
 
-            while not Is_Empty (Todo) loop
-               C    := Choose (Todo);
-               Todo := Remove (Todo, C);
-               N    := Element (Container.Nodes, C.Node);
+            if Has_Element (Left, L) then
 
-               for W in Way_Type loop
-                  if N.Ways (W) /= No_Element then
-                     Todo := Add (Todo, N.Ways (W));
+               --  Check that the same cursor exists in Right.
 
-                     M (N.Ways (W).Node) :=
-                       (Path     => Add (M (C.Node).Path, W),
-                        Parent   => C,
-                        Way      => W,
-                        Children => Element (Container.Nodes, N.Ways (W).Node)
-                                      .Ways,
-                        In_Tree  => True);
-                  end if;
-               end loop;
+               if not Has_Element (Right, R) then
+                  return False;
+               end if;
+
+               --  Check that both nodes have the same path
+
+               if not Same_Path (Left, Right, L, R) then
+                  return False;
+               end if;
+            end if;
+         end loop;
+
+         return True;
+      end Mapping_Preserved;
+
+      --------------------------------------
+      -- Mapping_Preserved_Except_Subtree --
+      --------------------------------------
+
+      function Mapping_Preserved_Except_Subtree
+        (Left, Right : Tree;
+         Position    : Cursor) return Boolean
+      is
+         L, R : Cursor;
+      begin
+         for I in 1 .. Node_Vectors.Last_Index (Left.Nodes) loop
+            L := Cursor'(Node => I);
+            R := L;
+
+            --  Skip over freed nodes, and nodes in the specified subtree
+
+            if Has_Element (Left, L)
+               and then not In_Subtree (Left, Position, L)
+            then
+
+               --  Check that the same cursor exists in Right.
+
+               if not Has_Element (Right, R) then
+                  return False;
+               end if;
+
+               --  Check that both nodes have the same path
+
+               if not Same_Path (Left, Right, L, R) then
+                  return False;
+               end if;
+            end if;
+         end loop;
+
+         return True;
+      end Mapping_Preserved_Except_Subtree;
+
+      -------------------------
+      -- Same_Mapping_Except --
+      -------------------------
+
+      function Same_Mapping_Except
+        (Left, Right : Tree;
+         Position    : Cursor) return Boolean
+      is
+         L, R : Cursor;
+      begin
+         for I in 1 .. Node_Vectors.Last_Index (Left.Nodes) loop
+            L := Cursor'(Node => I);
+            R := L;
+
+            --  Skip over freed nodes, and the specified node
+
+            if L /= Position and then Has_Element (Left, L) then
+
+               --  Check that the same cursor exists in Right.
+
+               if not Has_Element (Right, R) then
+                  return False;
+               end if;
+
+               --  Check that both nodes have the same path
+
+               if not Same_Path (Left, Right, L, R) then
+                  return False;
+               end if;
+            end if;
+         end loop;
+
+         --  Check for any other nodes in Right that are not in Left
+
+         if Node_Vectors.Last_Index (Left.Nodes)
+            < Node_Vectors.Last_Index (Right.Nodes)
+         then
+            for I in Node_Vectors.Last_Index (Left.Nodes) + 1 ..
+                     Node_Vectors.Last_Index (Right.Nodes)
+            loop
+               if I /= Position.Node
+                  and then Has_Element (Right, Cursor'(Node => I))
+               then
+                  return False;
+               end if;
             end loop;
          end if;
 
-         return M;
+         return True;
+      end Same_Mapping_Except;
+
+      ---------------------------------
+      -- Same_Mapping_Except_Subtree --
+      ---------------------------------
+
+      function Same_Mapping_Except_Subtree
+        (Left, Right : Tree;
+         Position    : Cursor) return Boolean
+      is
+         L, R : Cursor;
+      begin
+         for I in 1 .. Node_Vectors.Last_Index (Left.Nodes) loop
+            L := Cursor'(Node => I);
+            R := L;
+
+            --  Skip over freed nodes, and nodes in the specified subtree
+
+            if Has_Element (Left, L)
+               and then not In_Subtree (Left, Position, L)
+            then
+
+               --  Check that the same cursor exists in Right.
+
+               if not Has_Element (Right, R) then
+                  return False;
+               end if;
+
+               --  Check that both nodes have the same path
+
+               if not Same_Path (Left, Right, L, R) then
+                  return False;
+               end if;
+            end if;
+         end loop;
+
+         --  Check for any other nodes in Right that are not in Left and not
+         --  in the specified subtree.
+
+         if Node_Vectors.Last_Index (Left.Nodes)
+            < Node_Vectors.Last_Index (Right.Nodes)
+         then
+            for I in Node_Vectors.Last_Index (Left.Nodes) + 1 ..
+                     Node_Vectors.Last_Index (Right.Nodes)
+            loop
+               R := Cursor'(Node => I);
+               if Has_Element (Right, R)
+                  and then not In_Subtree (Right, Position, R)
+               then
+                  return False;
+               end if;
+            end loop;
+         end if;
+
+         return True;
+      end Same_Mapping_Except_Subtree;
+
+      function Subtree_Mapping_Shifted
+        (Left, Right  : Tree;
+         Subtree_Root : M.Path_Type;
+         Way          : Way_Type) return Boolean
+      is
+        (True);
+
+      function Subtree_Remapped
+        (Left, Right : Tree;
+         Old_Subtree : M.Path_Type;
+         New_Subtree : M.Path_Type) return Boolean
+      is
+        (True);
+
+      function Ancestry_Preserved (Left, Right : Tree) return Boolean is
+        (True);
+
+      -----------
+      -- Paths --
+      -----------
+
+      function Paths (Container : Tree) return P.Map is
+         Result : P.Map := P.Empty_Map;
+      begin
+         for I in 1 .. Node_Vectors.Length (Container.Nodes) loop
+            if not Node_Vectors.Constant_Reference (Container.Nodes, I).Free
+            then
+               Result := P.Add (Result,
+                                Cursor'(Node => I),
+                                Get_Path (Container.Nodes, I));
+            end if;
+         end loop;
+
+         return Result;
+      end Paths;
+
+      -----------
+      -- Model --
+      -----------
+
+      function Model (Container : Tree) return M.Tree is
+         pragma Unreferenced (Container);
+      begin
+         return M.Empty_Tree; --  TODO
       end Model;
+
+      ------------
+      -- M_Path --
+      ------------
+
+      function M_Path
+        (Container : Tree;
+         Position  : Cursor) return M.Path_Type
+      is
+      begin
+         if not Has_Element (Container, Position) then
+            raise Constraint_Error;
+         end if;
+
+         return Get_Path (Container.Nodes, Position.Node);
+      end M_Path;
 
    end Formal_Model;
 
@@ -119,14 +328,16 @@ is
       return Boolean
    is
    begin
-      if not Node_Vectors.Has_Element (Container.Nodes, Position.Node) then
+      if Position.Node not in 1 .. Node_Vectors.Last_Index (Container.Nodes)
+      then
          return False;
       end if;
 
       declare
          Node_Acc : constant not null access constant Node_Type :=
                       Node_Vectors.Constant_Reference
-                        (Container.Nodes, Position.Node);
+                        (Container.Nodes, Position.Node)
+                        .Element;
       begin
          return not Node_Acc.all.Free;
       end;
@@ -160,7 +371,8 @@ is
       declare
          Node_Acc : constant not null access Node_Type :=
                       Node_Vectors.Reference
-                        (Container.Nodes'Access, Position.Node);
+                        (Container.Nodes, Position.Node)
+                        .Element;
       begin
          Node_Acc.all.Element := New_Item;
       end;
@@ -195,7 +407,8 @@ is
       declare
          Node_Acc : constant not null access constant Node_Type :=
                       Node_Vectors.Constant_Reference
-                        (Container.Nodes, Position.Node);
+                        (Container.Nodes, Position.Node)
+                        .Element;
       begin
          return (for all C of Node_Acc.all.Ways => C = No_Element);
       end;
@@ -237,7 +450,8 @@ is
          declare
             Node_Acc : constant not null access constant Node_Type :=
                          Node_Vectors.Constant_Reference
-                           (Container.Nodes, Node.Node);
+                           (Container.Nodes, Node.Node)
+                           .Element;
          begin
             --  Find the last child
             for W in reverse Way_Type loop
@@ -285,7 +499,8 @@ is
       declare
          Pos_Acc : constant not null access constant Node_Type :=
                       Node_Vectors.Constant_Reference
-                        (Container.Nodes, Position.Node);
+                        (Container.Nodes, Position.Node)
+                        .Element;
 
       begin
          --  Find the first child
@@ -308,7 +523,8 @@ is
          declare
             Parent_Acc : constant not null access constant Node_Type :=
                            Node_Vectors.Constant_Reference
-                             (Container.Nodes, Pos_Acc.all.Parent.Node);
+                             (Container.Nodes, Pos_Acc.all.Parent.Node)
+                             .Element;
          begin
             if Pos_Acc.all.Position /= Way_Type'Last then
                for W in Way_Type'Succ (Pos_Acc.all.Position) .. Way_Type'Last
@@ -332,7 +548,8 @@ is
             declare
                Node_Acc : constant not null access constant Node_Type :=
                            Node_Vectors.Constant_Reference
-                             (Container.Nodes, Node.Node);
+                             (Container.Nodes, Node.Node)
+                             .Element;
             begin
                if Dir /= Way_Type'Last then
                   for W in Way_Type'Succ (Dir) .. Way_Type'Last loop
@@ -351,59 +568,6 @@ is
       end;
    end Next;
 
-   ----------
-   -- Prev --
-   ----------
-
-   function Prev
-     (Container : Tree;
-      Position  : Cursor)
-      return Cursor
-   is
-      Node : Cursor;
-
-   begin
-      if not Has_Element (Container, Position) then
-         return No_Element;
-      end if;
-
-      declare
-         Pos_Acc : constant not null access constant Node_Type :=
-                      Node_Vectors.Constant_Reference
-                        (Container.Nodes, Position.Node);
-
-      begin
-         --  Try and find the previous sibling (if the node
-         --  is not the root).
-
-         if Pos_Acc.all.Parent = No_Element then
-            return No_Element;
-         end if;
-
-         declare
-            Parent_Acc : constant not null access constant Node_Type :=
-                           Node_Vectors.Constant_Reference
-                             (Container.Nodes, Pos_Acc.all.Parent.Node);
-         begin
-            if Pos_Acc.all.Position /= Way_Type'First then
-               for W in reverse Way_Type'First ..
-                                Way_Type'Pred (Pos_Acc.all.Position)
-               loop
-                  Node := Parent_Acc.all.Ways (W);
-
-                  if Node /= No_Element then
-                     return Last_In_Subtree (Container, Node);
-                  end if;
-               end loop;
-            end if;
-         end;
-
-         --  No previous siblings, so return the parent.
-
-         return Parent (Container, Position);
-      end;
-   end Prev;
-
    -----------------
    -- First_Child --
    -----------------
@@ -421,7 +585,8 @@ is
       declare
          Node_Acc : constant not null access constant Node_Type :=
                       Node_Vectors.Constant_Reference
-                        (Container.Nodes, Position.Node);
+                        (Container.Nodes, Position.Node)
+                        .Element;
       begin
          for C of Node_Acc.all.Ways loop
             if C /= No_Element then
@@ -468,7 +633,8 @@ is
       declare
          Node_Acc : constant not null access constant Node_Type :=
                       Node_Vectors.Constant_Reference
-                        (Container.Nodes, Position.Node);
+                        (Container.Nodes, Position.Node)
+                        .Element;
       begin
          for C of reverse Node_Acc.all.Ways loop
             if C /= No_Element then
@@ -515,7 +681,8 @@ is
       declare
          Node_Acc : constant not null access constant Node_Type :=
                       Node_Vectors.Constant_Reference
-                        (Container.Nodes, Position.Node);
+                        (Container.Nodes, Position.Node)
+                        .Element;
       begin
          if Node_Acc.all.Parent = No_Element
             or else Node_Acc.all.Position = Way_Type'Last
@@ -526,7 +693,8 @@ is
          declare
             Parent_Acc : constant not null access constant Node_Type :=
                            Node_Vectors.Constant_Reference
-                             (Container.Nodes, Node_Acc.all.Parent.Node);
+                             (Container.Nodes, Node_Acc.all.Parent.Node)
+                             .Element;
          begin
             for W in Way_Type'Succ (Node_Acc.all.Position) .. Way_Type'Last
             loop
@@ -539,49 +707,6 @@ is
 
       return No_Element;
    end Next_Sibling;
-
-   ------------------
-   -- Prev_Sibling --
-   ------------------
-
-   function Prev_Sibling
-     (Container : Tree;
-      Position  : Cursor)
-      return Cursor
-   is
-   begin
-      if not Has_Element (Container, Position) then
-         return No_Element;
-      end if;
-
-      declare
-         Node_Acc : constant not null access constant Node_Type :=
-                      Node_Vectors.Constant_Reference
-                        (Container.Nodes, Position.Node);
-      begin
-         if Node_Acc.all.Parent = No_Element
-            or else Node_Acc.all.Position = Way_Type'First
-         then
-            return No_Element;
-         end if;
-
-         declare
-            Parent_Acc : constant not null access constant Node_Type :=
-                           Node_Vectors.Constant_Reference
-                             (Container.Nodes, Node_Acc.all.Parent.Node);
-         begin
-            for W in reverse Way_Type'First ..
-                             Way_Type'Pred (Node_Acc.all.Position)
-            loop
-               if Parent_Acc.all.Ways (W) /= No_Element then
-                  return Parent_Acc.all.Ways (W);
-               end if;
-            end loop;
-         end;
-      end;
-
-      return No_Element;
-   end Prev_Sibling;
 
    ------------------
    -- Root_Element --
@@ -612,7 +737,8 @@ is
          declare
             Node_Acc : constant not null access constant Node_Type :=
                         Node_Vectors.Constant_Reference
-                           (Container.Nodes, Position.Node);
+                           (Container.Nodes, Position.Node)
+                           .Element;
          begin
             return Node_Acc.all.Parent;
          end;
@@ -636,7 +762,8 @@ is
          declare
             Node_Acc : constant not null access constant Node_Type :=
                         Node_Vectors.Constant_Reference
-                           (Container.Nodes, Position.Node);
+                           (Container.Nodes, Position.Node)
+                           .Element;
          begin
             return Node_Acc.all.Ways (Way);
          end;
@@ -660,7 +787,8 @@ is
       declare
          Node_Acc : constant not null access constant Node_Type :=
                       Node_Vectors.Constant_Reference
-                        (Container.Nodes, Position.Node);
+                        (Container.Nodes, Position.Node)
+                        .Element;
       begin
          return Node_Acc.all.Position;
       end;
@@ -684,6 +812,45 @@ is
 
       return Node /= No_Element;
    end Is_Ancestor;
+
+   ----------------
+   -- In_Subtree --
+   ----------------
+
+   function In_Subtree
+     (Container    : Tree;
+      Subtree_Root : Cursor;
+      Position     : Cursor)
+      return Boolean
+   is
+     (Has_Element (Container, Subtree_Root)
+      and then Has_Element (Container, Position)
+      and then (Position = Subtree_Root
+                or else Is_Ancestor (Container, Subtree_Root, Position)));
+
+   ---------------
+   -- In_Branch --
+   ---------------
+
+   function In_Branch
+     (Container    : Tree;
+      Ancestor     : Cursor;
+      Position     : Cursor;
+      Way          : Way_Type)
+      return Boolean
+   is
+      C : Cursor;
+   begin
+      if not Has_Element (Container, Ancestor)
+         or else not Has_Element (Container, Position)
+      then
+         return False;
+      end if;
+
+      C := Child (Container, Ancestor, Way);
+
+      return Position = C or else Is_Ancestor (Container, C, Position);
+   end In_Branch;
 
    -----------
    -- Depth --
@@ -748,7 +915,8 @@ is
          declare
             Node_Acc : constant not null access Node_Type :=
                          Node_Vectors.Reference
-                           (Container.Nodes'Access, Node.Node);
+                           (Container.Nodes, Node.Node)
+                           .Element;
          begin
             Node_Acc.all := Node_Type'(Element  => New_Item,
                                        Parent   => Position,
@@ -773,7 +941,8 @@ is
       declare
          Parent_Acc : constant not null access Node_Type :=
                         Node_Vectors.Reference
-                          (Container.Nodes'Access, Position.Node);
+                          (Container.Nodes, Position.Node)
+                          .Element;
       begin
          Parent_Acc.all.Ways (Way) :=
            Cursor'(Node => Node_Vectors.Last_Index (Container.Nodes));
@@ -801,7 +970,8 @@ is
          declare
             Node_Acc : constant not null access Node_Type :=
                          Node_Vectors.Reference
-                           (Container.Nodes'Access, New_Node.Node);
+                           (Container.Nodes, New_Node.Node)
+                          .Element;
          begin
             Node_Acc.all := Node_Type'
                               (Element  => New_Item,
@@ -833,7 +1003,8 @@ is
       declare
          New_Node_Acc : constant not null access Node_Type :=
                           Node_Vectors.Reference
-                            (Container.Nodes'Access, New_Node.Node);
+                            (Container.Nodes, New_Node.Node)
+                            .Element;
       begin
          New_Node_Acc.Ways (Way) := Position;
       end;
@@ -843,7 +1014,8 @@ is
       declare
          Parent_Acc : constant not null access Node_Type :=
                         Node_Vectors.Reference
-                          (Container.Nodes'Access, Parent_Pos.Node);
+                          (Container.Nodes, Parent_Pos.Node)
+                          .Element;
       begin
          for W of Parent_Acc.all.Ways loop
             if W = Position then
@@ -857,7 +1029,8 @@ is
       declare
          Position_Acc : constant not null access Node_Type :=
                         Node_Vectors.Reference
-                          (Container.Nodes'Access, Position.Node);
+                          (Container.Nodes, Position.Node)
+                          .Element;
       begin
          Position_Acc.all.Parent := New_Node;
       end;
@@ -888,12 +1061,14 @@ is
          declare
             Node_Acc   : constant not null access constant Node_Type :=
                            Node_Vectors.Constant_Reference
-                             (Container.Nodes, Position.Node);
+                             (Container.Nodes, Position.Node)
+                             .Element;
 
             Parent_Acc : constant not null access Node_Type :=
                            Node_Vectors.Reference
-                             (Container.Nodes'Access,
-                              Node_Acc.all.Parent.Node);
+                             (Container.Nodes,
+                              Node_Acc.all.Parent.Node)
+                             .Element;
          begin
             Parent_Acc.all.Ways (Node_Acc.all.Position) := No_Element;
          end;
@@ -903,60 +1078,6 @@ is
          Add_To_Free_List_Recursive (Container, Position);
       end if;
    end Delete;
-
-   ------------------
-   -- Move_Subtree --
-   ------------------
-
-   procedure Move_Subtree
-     (Container    : in out Tree;
-      Subtree_Root :        Cursor;
-      New_Parent   :        Cursor;
-      Way          :        Way_Type)
-   is
-   begin
-      if not Has_Element (Container, Subtree_Root)
-         or else not Has_Element (Container, New_Parent)
-      then
-         raise Constraint_Error with "Invalid cursor";
-      end if;
-
-      if Child (Container, New_Parent, Way) /= No_Element then
-         raise Constraint_Error with
-           "New_Parent already has a child at the requested Way";
-      end if;
-
-      if New_Parent = Subtree_Root or else
-         Is_Ancestor (Container, Subtree_Root, New_Parent)
-      then
-         raise Constraint_Error with "Splice would result in a cycle";
-      end if;
-
-      declare
-         ST_Node_Acc : constant not null access Node_Type :=
-                         Node_Vectors.Reference
-                           (Container.Nodes'Access, Subtree_Root.Node);
-
-         Old_Parent_Acc : constant not null access Node_Type :=
-                            Node_Vectors.Reference
-                              (Container.Nodes'Access,
-                               ST_Node_Acc.all.Parent.Node);
-
-         New_Parent_Acc : constant not null access Node_Type :=
-                            Node_Vectors.Reference
-                              (Container.Nodes'Access, New_Parent.Node);
-      begin
-         --  Unlink the Subtree_Root from its old parent
-         Old_Parent_Acc.all.Ways (ST_Node_Acc.all.Position) := No_Element;
-
-         --  Link the Subtree_Root to its new parent
-         New_Parent_Acc.all.Ways (Way) := Subtree_Root;
-
-         --  Update Subtree_Root to reference its new parent
-         ST_Node_Acc.all.Parent   := New_Parent;
-         ST_Node_Acc.all.Position := Way;
-      end;
-   end Move_Subtree;
 
    ------------------------
    -- Constant_Reference --
@@ -970,7 +1091,7 @@ is
    begin
       return Node_Vectors.Constant_Reference
                (Container.Nodes, Position.Node)
-               .all.Element'Access;
+               .Element.all.Element'Access;
    end Constant_Reference;
 
    ---------------
@@ -984,8 +1105,8 @@ is
    is
    begin
       return Node_Vectors.Reference
-               (Container.all.Nodes'Access, Position.Node)
-               .all.Element'Access;
+               (Container.all.Nodes, Position.Node)
+               .Element.all.Element'Access;
    end Reference;
 
    --------------------------
@@ -1003,7 +1124,8 @@ is
          declare
             Node_Acc : constant not null access Node_Type :=
                          Node_Vectors.Reference
-                           (Container.Nodes'Access, Node.Node);
+                           (Container.Nodes, Node.Node)
+                           .Element;
          begin
             Node_Acc.all.Free   := False;
             Container.Free_List := Node_Acc.all.Ways (Way_Type'First);
@@ -1020,7 +1142,7 @@ is
       Node      :        Cursor)
    is
       Node_Acc : constant not null access Node_Type :=
-                   Node_Vectors.Reference (Container.Nodes'Access, Node.Node);
+                   Node_Vectors.Reference (Container.Nodes, Node.Node).Element;
    begin
       --  Delete all child nodes
 
@@ -1040,5 +1162,83 @@ is
       Container.Free_List                := Node;
       Container.Length                   := Container.Length - 1;
    end Add_To_Free_List_Recursive;
+
+   --------------
+   -- Get_Path --
+   --------------
+
+   function Get_Path
+     (Container : Node_Vectors.Vector;
+      Node      : Index_Type) return M.Path_Type
+   is
+      Result : M.Path_Type;
+
+   begin
+      while Node /= 0 loop
+         declare
+            Node_Acc : constant access constant Node_Type :=
+                         Node_Vectors.Constant_Reference (Container, Node)
+                         .Element;
+         begin
+            Result := M.Insert (Result, 0, Node_Acc.all.Position);
+         end;
+      end loop;
+
+      return Result;
+   end Get_Path;
+
+   ---------------
+   -- Same_Path --
+   ---------------
+
+   function Same_Path
+     (Left, Right : Tree;
+      L_Position : Cursor;
+      R_Position : Cursor) return Boolean
+   is
+      L : Cursor := L_Position;
+      R : Cursor := R_Position;
+
+   begin
+
+      --  Walk up both trees, starting and L and R in Left and Right
+      --  respectively, checking that the path to the node from their
+      --  parents are the same at each step.
+
+      while L /= No_Element loop
+
+         --  Check if R hit the root before L
+
+         if R = No_Element then
+            return False;
+         end if;
+
+         declare
+            L_Acc : constant not null access constant Node_Type :=
+                        Node_Vectors.Constant_Reference
+                          (Left.Nodes, L.Node).Element;
+            R_Acc : constant not null access constant Node_Type :=
+                        Node_Vectors.Constant_Reference
+                          (Right.Nodes, R.Node).Element;
+         begin
+            --  Check that both nodes have the same position w.r.t
+            --  their parent.
+
+            if L_Acc.all.Position /= R_Acc.all.Position then
+               return False;
+            end if;
+
+            --  Go up and check the parent
+
+            L := L_Acc.all.Parent;
+            R := R_Acc.all.Parent;
+         end;
+      end loop;
+
+      --  L and R should both have hit the root at the same time if they have
+      --  the same path.
+
+      return R = No_Element;
+   end Same_Path;
 
 end Stree.Unbounded_Multiway_Trees;

@@ -4,10 +4,13 @@
 --  SPDX-License-Identifier: Apache-2.0
 --
 with SPARK.Big_Integers;                  use SPARK.Big_Integers;
+with SPARK.Containers.Functional.Maps;
+with SPARK.Containers.Parameter_Checks;
 with SPARK.Containers.Types;              use SPARK.Containers.Types;
-with SPARK.Containers.Functional.Vectors;
 
-private with SPARK.Containers.Formal.Unbounded_Vectors;
+with Stree.Functional.Multiway_Trees;
+
+private with Ada.Containers.Vectors;
 
 --  This package implements an unbounded multi-way tree container.
 --
@@ -27,9 +30,6 @@ private with SPARK.Containers.Formal.Unbounded_Vectors;
 --  be iterated over using iterator loops. "for .. in" loops iterate over
 --  cursors, and "for .. of" loops iterate over elements.
 --
---  Reverse iteration is also possible using the functions Last, Prev, and
---  Has_Element.
---
 --  Quantification over trees is also available using "for all" and "for some".
 
 generic
@@ -37,6 +37,16 @@ generic
    type Way_Type is (<>);
    with function Equivalent_Elements
                    (Left, Right : Element_Type) return Boolean is "=";
+
+   --  Ghost lemmas used to prove that "=" is an equivalence relation
+
+   with procedure Eq_Reflexive (X : Element_Type) is null
+     with Ghost;
+   with procedure Eq_Symmetric (X, Y : Element_Type) is null
+     with Ghost;
+   with procedure Eq_Transitive (X, Y, Z : Element_Type) is null
+     with Ghost;
+
 package Stree.Unbounded_Multiway_Trees with
   SPARK_Mode => On
 is
@@ -68,6 +78,10 @@ is
      Post   => Is_Empty (Empty_Tree'Result);
    --  Create an empty tree
 
+   function Length (Container : Tree) return Count_Type with
+     Global => null;
+   --  Get the number of elements in the tree
+
    pragma Unevaluated_Use_Of_Old (Allow);
 
    ------------------
@@ -76,302 +90,332 @@ is
 
    package Formal_Model with Ghost is
 
-      subtype Valid_Cursor_Range is Count_Type range 1 .. Count_Type'Last;
-
       package Count_Type_Conversions is new
         SPARK.Big_Integers.Signed_Conversions (Count_Type);
+      use Count_Type_Conversions;
 
-      function To_Cursor (I : Count_Type) return Cursor is
-        (Cursor'(Node => I));
+      --  Logical equality cannot be safely executed on most element or key
+      --  types. Thus, this package should only be instantiated with ghost code
+      --  disabled. This is enforced by having a special imported procedure
+      --  Check_Or_Fail that will lead to link-time errors otherwise.
 
-      -----------
-      -- Paths --
-      -----------
-
-      package Way_Sequences is new SPARK.Containers.Functional.Vectors
-        (Index_Type   => Valid_Cursor_Range,
-         Element_Type => Way_Type,
-         "="          => "=");
-      use Way_Sequences;
-
-      function Is_Concat (Q, V, P : Way_Sequences.Sequence) return Boolean is
-        (Length (P) - Length (V) = Length (Q)
-         and then (for all I in 1 .. Last (Q) => Get (P, I) = Get (Q, I))
-         and then (for all I in 1 .. Last (V) =>
-                    Get (P, I + Last (Q)) = Get (V, I))
-         and then (for all I in Last (Q) + 1 .. Last (P) =>
-                    Get (V, I - Last (Q)) = Get (P, I)))
+      function Element_Logic_Equal (Left, Right : Element_Type) return Boolean
       with
-        Pre =>
-          Length (Q) < To_Big_Integer (Integer (Valid_Cursor_Range'Last));
-      --  Returns True if P is the concatenation of Q & V.
+        Global => null,
+        Annotate => (GNATprove, Logical_Equal);
 
-      function Is_Insert
-        (V, P : Way_Sequences.Sequence;
-         I    : Valid_Cursor_Range;
-         E    : Way_Type)
-         return Boolean
-      is
-        (Length (P) = Length (V) + 1
-         and then (for all J in 1 .. Last (P) =>
-                     (if    J < I then Get (P, J) = Get (V, J)
-                      elsif J = I then Get (P, J) = E
-                      else             Get (P, J) = Get (V, J - 1))))
-      with
-        Pre => I in 1 .. Last (P)
-               and then Length (P) <=
-                          To_Big_Integer (Integer (Valid_Cursor_Range'Last));
-      --  Returns True if P is equal to V with element E inserted at index I
+      --------------------------
+      -- Instantiation Checks --
+      --------------------------
 
-      function Is_Add
-        (S1 : Way_Sequences.Sequence;
-         W  : Way_Type;
-         S2 : Way_Sequences.Sequence)
-         return Boolean
-      is
-        (Length (S2) - 1 = Length (S1)
-         and then S1 < S2
-         and then Get (S2, Last (S2)) = W);
-      --  Returns True if S2 is equal to S1 with W appended to it
+      package Eq_Checks is new
+        SPARK.Containers.Parameter_Checks.Equivalence_Checks
+          (T                   => Element_Type,
+           Eq                  => "=",
+           Param_Eq_Reflexive  => Eq_Reflexive,
+           Param_Eq_Symmetric  => Eq_Symmetric,
+           Param_Eq_Transitive => Eq_Transitive);
+      --  Check that the actual parameter for "=" is an equivalence relation
+
+      package Lift_Eq is new
+        SPARK.Containers.Parameter_Checks.Lift_Eq_Reflexive
+          (T                  => Element_Type,
+           "="                => Element_Logic_Equal,
+           Eq                 => "=",
+           Param_Eq_Reflexive => Eq_Checks.Eq_Reflexive);
 
       ------------------
       -- Formal Model --
       ------------------
 
-      --  The formal tree model is represented as an array of nodes, where
-      --  each index maps to a cursor. Each node has references (cursors) to
-      --  its parent and child nodes. The postcondition of the Model function
-      --  constrains these references to organise them into a tree structure.
+      subtype Positive_Count_Type is Count_Type range 1 .. Count_Type'Last;
 
-      type Model_Node is record
-         Path     : Way_Sequences.Sequence;
-         --  The path from the root to this node
+      package M is new Stree.Functional.Multiway_Trees
+        (Element_Type                   => Element_Type,
+         Way_Type                       => Way_Type,
+         Equivalent_Elements            => "=",
+         Eq_Reflexive                   => Eq_Reflexive,
+         Eq_Symmetric                   => Eq_Symmetric,
+         Eq_Transitive                  => Eq_Transitive,
+         Equivalent_Elements_Reflexive  => Lift_Eq.Eq_Reflexive,
+         Equivalent_Elements_Symmetric  => Eq_Checks.Eq_Symmetric,
+         Equivalent_Elements_Transitive => Eq_Checks.Eq_Transitive);
 
-         Parent   : Cursor;
-         --  The parent node. This is No_Element for the root node.
+      use type M.Path_Type;
 
-         Way      : Way_Type;
-         --  Which direction is taken from the parent to get to this node.
+      function "="  (Left, Right : M.Tree) return Boolean renames M."=";
+      function "<=" (Left, Right : M.Tree) return Boolean renames M."<=";
 
-         Children : Way_Cursor_Array;
-         --  References to each child node
+      function Model (Container : Tree) return M.Tree with
+      --  The high-level model of a tree is a tree that references tree nodes
+      --  by their paths from the root. Cursors are not represented in this
+      --  model.
 
-         In_Tree  : Boolean;
-         --  True if this node exists in the tree. This is false for nodes that
-         --  are not in the tree.
-      end record;
-
-      type Model_Type is array (Valid_Cursor_Range) of Model_Node with
-        Predicate => (for all N of Model_Type =>
-                        Way_Sequences.Length (N.Path)
-                        < To_Big_Integer (Integer (Valid_Cursor_Range'Last)));
-
-      function Is_Empty (M : Model_Type) return Boolean is
-        (for all N of M => not N.In_Tree);
-
-      function Parent (M : Model_Type; C : Cursor) return Cursor is
-        (M (C.Node).Parent)
-      with
-        Pre => C /= No_Element;
-
-      function Path (M : Model_Type; C : Cursor) return Way_Sequences.Sequence
-      is
-        (M (C.Node).Path)
-      with
-        Pre => C /= No_Element;
-
-      function Has_Children
-        (M : Model_Type;
-         C : Cursor)
-         return Boolean
-      is
-        (C /= No_Element
-         and then (for some Ch of M (C.Node).Children => Ch /= No_Element));
-
-      function Child (M : Model_Type; C : Cursor; W : Way_Type) return Cursor
-      is
-        (M (C.Node).Children (W))
-      with
-        Pre => C /= No_Element;
-
-      function Children (M : Model_Type; C : Cursor) return Way_Cursor_Array is
-        (M (C.Node).Children)
-      with
-        Pre => C /= No_Element;
-
-      function Has_Sibling
-        (M : Model_Type;
-         C : Cursor;
-         W : Way_Type)
-         return Boolean
-      is
-        (C /= No_Element
-         and then Parent (M, C) /= No_Element
-         and then Child (M, Parent (M, C), W) /= No_Element);
-
-      function Sibling
-        (M : Model_Type;
-         C : Cursor;
-         W : Way_Type)
-         return Cursor
-      is
-        (M (M (C.Node).Parent.Node).Children (W))
-      with
-        Pre => Has_Element (M, C) and then not Is_Root (M, C);
-
-      function Has_Element (M : Model_Type; C : Cursor) return Boolean is
-        (C /= No_Element and then M (C.Node).In_Tree);
-
-      function Direction (M : Model_Type; C : Cursor) return Way_Type is
-        (M (C.Node).Way)
-      with
-        Pre => C /= No_Element;
-
-      function Is_Root (M : Model_Type; C : Cursor) return Boolean is
-        (C /= No_Element
-         and then M (C.Node).In_Tree
-         and then M (C.Node).Parent = No_Element);
-
-      function Is_Leaf (M : Model_Type; C : Cursor) return Boolean is
-        (C /= No_Element
-         and then M (C.Node).In_Tree
-         and then (for all Ch of M (C.Node).Children => Ch = No_Element));
-
-      function Is_Ancestor
-        (M          : Model_Type;
-         Ancestor   : Cursor;
-         Descendant : Cursor)
-         return Boolean
-      is
-        (Has_Element (M, Ancestor)
-         and then Has_Element (M, Descendant)
-         and then M (Ancestor.Node).Path < M (Descendant.Node).Path);
-
-      function In_Subtree
-        (M            : Model_Type;
-         Subtree_Root : Cursor;
-         Position     : Cursor)
-         return Boolean
-      is
-        (Has_Element (M, Subtree_Root)
-         and then Has_Element (M, Position)
-         and then Path (M, Subtree_Root) <= Path (M, Position));
-
-      function Depth (M : Model_Type; C : Cursor) return Count_Type is
-        (Count_Type (To_Integer (Length (Path (M, C)))))
-      with
-        Global => null,
-        Pre    => C /= No_Element;
-
-      function Model (Container : Tree) return Model_Type with
+        Ghost,
         Global => null,
         Post   =>
-          --  All nodes not in the tree have no parent or children, and have
-          --  an empty path
-          (for all N of Model'Result =>
-             (if not N.In_Tree then
-                N.Parent = No_Element
-                and then Length (N.Path) = 0
-                and then (for all C of N.Children => C = No_Element)))
+          Length (Container) = From_Big_Integer (M.Length (Model'Result));
 
-          --  For the root node (i.e. the node with no parent), the path to
-          --  itself is empty. For all other nodes the path is non-empty.
+      ---------------------------------
+      -- Mapping of Cursors to Paths --
+      ---------------------------------
+
+      --  The functional tree does not model cursors but instead references
+      --  tree nodes by the path to the node from the root as a sequence of
+      --  directions (ways) taken at each node along the path.
+      --
+      --  To model cursors we define a mapping between cursors and paths.
+      --  The mapping is injective, i.e. each valid cursor maps to a distinct
+      --  path in the formal model.
+
+      package P is new SPARK.Containers.Functional.Maps
+        (Key_Type     => Cursor,
+         Element_Type => M.Path_Type,
+         "="          => "=");
+
+      function Paths (Container : Tree) return P.Map with
+      --  Get the mapping of cursors to paths in the model
+
+        Ghost,
+        Global => null,
+        Post   =>
+          not P.Has_Key (Paths'Result, No_Element)
+
+          --  Every path references a node in the model
           and then
-            (for all N of Model'Result =>
-               (N.Parent = No_Element) = (Length (N.Path) = 0))
+            (for all C of Paths'Result =>
+               M.Contains (Model (Container), P.Get (Paths'Result, C)))
 
-          --  If the tree is not empty, then there is a root
+          --  Every node in the model has a cursor mapped to it
           and then
-            (if (for some N of Model'Result => N.In_Tree) then
-               (for some N of Model'Result =>
-                  N.In_Tree and then N.Parent = No_Element))
+            (for all Node of Model (Container) =>
+               (for some C of Paths'Result =>
+                  P.Get (Paths'Result, C) = Node))
 
-          --  The parent of all non-root nodes is in the tree, and the node is
-          --  is the child of its parent at the specified way
+          --  No two cursors map to the same path
           and then
-            (for all I in Model'Result'Range =>
-               (if Model'Result (I).In_Tree
-                   and then Model'Result (I).Parent /= No_Element
-                then (Model'Result (Model'Result (I).Parent.Node).In_Tree
-                      and then Model'Result
-                                 (Model'Result (I).Parent.Node)
-                                 .Children (Model'Result (I).Way)
-                                 .Node = I)))
+            (for all C1 of Paths'Result =>
+               (for all C2 of Paths'Result =>
+                  (if P.Get (Paths'Result, C1) = P.Get (Paths'Result, C2) then
+                     C1 = C2)))
 
-          --  If a node is in the tree, then its children are also in the tree
-          --  and that node is its parent
+          --  The parent of all non-root nodes is in the tree
           and then
-            (for all I in Model'Result'Range =>
-               (if Model'Result (I).In_Tree then
-                  (for all W in Way_Type =>
-                     (if Model'Result (I).Children (W) /= No_Element then
-                        Has_Element (Model'Result,
-                                     Model'Result (I).Children (W))
-                        and then Model'Result
-                                   (Model'Result (I).Children (W).Node)
-                                   .Parent.Node = I))))
+            (for all C1 of Paths'Result =>
+               (if not M.Is_Root (P.Get (Paths'Result, C1)) then
+                  (for some C2 of Paths'Result =>
+                     P.Get (Paths'Result, C2) =
+                       M.Parent (P.Get (Paths'Result, C1)))));
 
-          --  The path from the root to non-root tree nodes is equal to the
-          --  path to their parent extended by the last way to get to the
-          --  node. For other nodes, the path is empty.
-          and then
-            (for all I in Model'Result'Range =>
-               (if Model'Result (I).In_Tree
-                   and then Model (Container) (I).Parent /= No_Element
-                then Is_Add (Model'Result (Model'Result (I).Parent.Node).Path,
-                             Model'Result (I).Way,
-                             Model'Result (I).Path)))
+      function M_Path
+        (Container : Tree;
+         Position  : Cursor) return M.Path_Type
+      --  Get the path in the formal model that corresponds to the specified
+      --  cursor.
 
-          --  Nodes in the tree all have different associated paths
-          and then
-            (for all I in Model'Result'Range =>
-               (if Model'Result (I).In_Tree then
-                  (for all J in Model'Result'Range =>
-                     (if Model'Result (J).In_Tree
-                         and then Model'Result (J).Path = Model'Result (I).Path
-                      then J = I))))
+      with
+        Ghost,
+        Global   => null,
+        Pre      => P.Has_Key (Paths (Container), Position),
+        Post     => M_Path'Result = P.Get (Paths (Container), Position),
+        Annotate => (GNATprove, Inline_For_Proof);
 
-           --  There is exactly one root in the tree
-           and then
-             (for all I in Model'Result'Range =>
-                (for all J in Model'Result'Range =>
-                   (if Is_Root (Model'Result, To_Cursor (I))
-                       and then Is_Root (Model'Result, To_Cursor (J))
-                    then I = J)))
+      function Mapping_Preserved (Left, Right : Tree) return Boolean with
+      --  Returns True if, for all cursors of Left, the mapping of cursors to
+      --  paths is the same in Left and Right.
 
-           --  Nodes not in the tree have no children, no parent, and an empty
-           --  path.
-           and then
-             (for all N of Model'Result =>
-                (if not N.In_Tree then
-                   N.Parent = No_Element
-                   and then N.Path = Empty_Sequence
-                   and then N.Way = Way_Type'First
-                   and then (for all C of N.Children => C = No_Element)));
+        Ghost,
+        Global => null,
+        Post   =>
+          (if Mapping_Preserved'Result then
+             --  Right contains all the cursors of Left
+             P.Keys_Included (Paths (Left), Paths (Right))
+
+             --  Mappings from cursors to paths induced by Left and Right are
+             --  the same.
+             and then
+               (for all C of Paths (Left) =>
+                  M_Path (Left, C) = M_Path (Right, C)));
+
+      function Mapping_Preserved_Except_Subtree
+        (Left, Right : Tree;
+         Position    : Cursor) return Boolean
+      --  Returns True if, for all cursors of Left, the mapping of cursors to
+      --  paths is the same in Left and Right, except for cursors of Left that
+      --  are in the subtree rooted at Position.
+
+      with
+        Ghost,
+        Global => null,
+        Post   =>
+          (if Mapping_Preserved_Except_Subtree'Result then
+             --  Right contains all the cursors of Left that are not in the
+             --  subtree rooted at Position
+             (for all C of Paths (Left) =>
+                (if not M.In_Subtree (M_Path (Left, C),
+                                      M_Path (Left, Position))
+                 then P.Has_Key (Paths (Right), C)))
+
+             --  Mappings from cursors to paths induced by Left and Right are
+             --  the same, except for nodes in the subtree rooted at Position.
+             and then
+               (for all C of Paths (Left) =>
+                  (if not M.In_Subtree (M_Path (Left, C),
+                                        M_Path (Left, Position))
+                   then M_Path (Left, C) = M_Path (Right, C))));
+
+      function Subtree_Mapping_Shifted
+        (Left, Right  : Tree;
+         Subtree_Root : M.Path_Type;
+         Way          : Way_Type) return Boolean
+      --  Returns True if all cursors of Left that are in the subtree rooted at
+      --  Subtree_Root are shifted down by one position, specified by Way.
+      --
+      --  For example, given:
+      --   * a binary tree with ways L and R;
+      --   * Subtree_Root = [L, L, L]; and
+      --   * Way = R.
+      --
+      --  then the path to the subtree is remapped to [L, L, L, R] so that an
+      --  arbitrary cursor in the subtree, e.g. previously mapping to
+      --  [L, L, L, L, L], is remapped to [L, L, L, R, L, L].
+
+      with
+        Ghost,
+        Global => null,
+        Post   =>
+          (if Subtree_Mapping_Shifted'Result then
+             (for all C of Paths (Left) =>
+                (if M.In_Subtree (M_Path (Left, C),
+                                  Subtree_Root)
+                 then P.Has_Key (Paths (Right), C)))
+
+             and then
+               (for all C of Paths (Left) =>
+                  (if M.In_Subtree (M_Path (Left, C),
+                                    Subtree_Root)
+                   then M_Path (Right, C) =
+                          M.Insert (Path  => M_Path (Left, C),
+                                    After => M.Length (Subtree_Root),
+                                    Value => Way))));
+
+      function Subtree_Remapped
+        (Left, Right : Tree;
+         Old_Subtree : M.Path_Type;
+         New_Subtree : M.Path_Type) return Boolean
+      --  Returns True if all cursors of Left that are in the subtree rooted at
+      --  Old_Subtree are remapped to the same position with New_Subtree.
+      --
+      --  For example, given:
+      --   * a binary tree with ways L and R;
+      --   * Old_Subtree = [L, L]; and
+      --   * New_Subtree = [R, R].
+      --
+      --  Then for an arbitrary cursor in Left which maps to path [L, L, R, L],
+      --  that same cursor now maps to [R, R, R, L] in Right.
+
+      with
+        Ghost,
+        Global => null,
+        Post   =>
+          (if Subtree_Remapped'Result then
+             --  Right contains all the cursors of Left that are in the
+             --  subtree rooted at Old_Subtree
+             (for all C of Paths (Left) =>
+                (if M.In_Subtree (M_Path (Left, C), Old_Subtree) then
+                   P.Has_Key (Paths (Right), C)))
+
+             --  Cursors in Old_Subtree in Left are now remapped to New_Subtree
+             --  in Right.
+             and then
+               (for all C of Paths (Left) =>
+                  (if M.In_Subtree (M_Path (Left, C), Old_Subtree) then
+                     M_Path (Right, C) =
+                       M.Splice_Path
+                         (Old_Subtree, M_Path (Left, C), New_Subtree))));
+
+      function Same_Mapping_Except
+        (Left, Right : Tree;
+         Position    : Cursor) return Boolean
+      --  Returns true if the mapping of cursors to paths is the same in Left
+      --  and Right, except for the node at Position.
+
+      with
+        Ghost,
+        Global => null,
+        Post   =>
+          (if Same_Mapping_Except'Result then
+             --  Right contains the same cursors of Left, except for the
+             --  one node at Position.
+             P.Keys_Included_Except (Paths (Left), Paths (Right), Position)
+             and then
+               P.Keys_Included_Except (Paths (Right), Paths (Left), Position)
+
+             --  Mappings from cursors to paths induced by Left and Right are
+             --  the same.
+             and then
+               (for all C of Paths (Left) =>
+                  (if C /= Position then
+                     M_Path (Left, C) = M_Path (Right, C))));
+
+      function Same_Mapping_Except_Subtree
+        (Left, Right : Tree;
+         Position    : Cursor) return Boolean
+      --  Right has the same mapping as Left, except for the subtree rooted at
+      --  Position in Left which is removed in Right.
+
+      with
+        Ghost,
+        Global => null,
+        Post   =>
+          (if Same_Mapping_Except_Subtree'Result then
+             --  Right contains all the cursors of Left, except for nodes in
+             --  the subtree rooted at Position
+             (for all C of Paths (Left) =>
+                P.Has_Key (Paths (Right), C) =
+                  not M.In_Subtree (M_Path (Left, C), M_Path (Left, Position)))
+
+             and then P.Keys_Included (Paths (Right), Paths (Left))
+
+             --  Mappings from cursors to paths induced by Left and Right are
+             --  the same.
+             and then
+               (for all C of Paths (Left) =>
+                  (if not M.In_Subtree
+                           (M_Path (Left, C), M_Path (Left, Position))
+                   then M_Path (Left, C) = M_Path (Right, C))));
+
+      function Ancestry_Preserved (Left, Right : Tree) return Boolean with
+        Ghost,
+        Global => null,
+        Post   =>
+          Ancestry_Preserved'Result =
+            (for all C1 of Paths (Left) =>
+               (for all C2 of Paths (Left) =>
+                  (if M_Path (Left, C1) < M_Path (Left, C2) then
+                     P.Has_Key (Paths (Right), C1)
+                     and then P.Has_Key (Paths (Right), C2)
+                     and then M_Path (Right, C1) < M_Path (Right, C2)))),
+        Annotate => (GNATprove, Inline_For_Proof);
 
    end Formal_Model;
-
    use Formal_Model;
-
-   use type Formal_Model.Way_Sequences.Sequence;
+   use type M.Path_Type;
 
    function Is_Empty (Container : Tree) return Boolean with
-     Global => null,
-     Post   => Is_Empty'Result = Is_Empty (Model (Container));
+     Global   => null,
+     Post     => Is_Empty'Result = M.Is_Empty (Model (Container)),
+     Annotate => (GNATprove, Inline_For_Proof);
    --  Query if the tree contains no elements
-
-   function Length (Container : Tree) return Count_Type with
-     Global => null,
-     Post   => Is_Empty (Model (Container)) = (Length'Result = 0);
-   --  Get the number of elements in the tree
 
    function Has_Element
      (Container : Tree;
       Position  : Cursor)
       return Boolean
    with
-     Global => null,
-     Post   => Has_Element'Result = Has_Element (Model (Container), Position);
+     Global   => null,
+     Post     => Has_Element'Result = P.Has_Key (Paths (Container), Position),
+     Annotate => (GNATprove, Inline_For_Proof);
    --  Query if the tree has an element at the specified cursor
 
    function Element
@@ -380,7 +424,11 @@ is
       return Element_Type
    with
      Global => null,
-     Pre => Has_Element (Container, Position);
+     Pre    => Has_Element (Container, Position),
+     Post   =>
+       Element'Result = M.Get (Model (Container),
+                               M_Path (Container, Position)),
+     Annotate => (GNATprove, Inline_For_Proof);
    --  Get the element at the specified position in the tree
 
    procedure Replace_Element
@@ -389,19 +437,18 @@ is
       New_Item  :        Element_Type)
    with
      Global => null,
-     Pre    => Has_Element (Model (Container), Position),
-     Post   => --  The element is updated with the new value
-               Equivalent_Elements (Element (Container, Position), New_Item)
+     Pre    => Has_Element (Container, Position),
+     Post   => Model (Container) =
+                 M.Set (Model (Container'Old),
+                        M_Path (Container, Position),
+                        New_Item)
 
-               --  The tree structure is unchanged.
-               and then Model (Container) = Model (Container'Old)
-
-               --  All other elements are unchanged
-               and then (for all I in Valid_Cursor_Range =>
-                           (if To_Cursor (I) /= Position then
-                              Equivalent_Elements
-                                (Element (Container'Old, To_Cursor (I)),
-                                 Element (Container, To_Cursor (I)))));
+               and then Mapping_Preserved
+                          (Left  => Container,
+                           Right => Container'Old)
+               and then Mapping_Preserved
+                          (Left  => Container'Old,
+                           Right => Container);
 
    function Is_Root
      (Container : Tree;
@@ -409,7 +456,10 @@ is
       return Boolean
    with
      Global => null,
-     Post   => Is_Root'Result = Is_Root (Model (Container), Position);
+     Post   => Is_Root'Result =
+                 (Has_Element (Container, Position)
+                  and then M_Path (Container, Position) = M.Root),
+     Annotate => (GNATprove, Inline_For_Proof);
    --  Query if a cursor references the root of the tree.
 
    function Is_Leaf
@@ -418,7 +468,11 @@ is
       return Boolean
    with
      Global => null,
-     Post   => Is_Leaf'Result = Is_Leaf (Model (Container), Position);
+     Post   => Is_Leaf'Result =
+                 (Has_Element (Container, Position)
+                  and then M.Is_Leaf (Model (Container),
+                                      M_Path (Container, Position))),
+     Annotate => (GNATprove, Inline_For_Proof);
    --  Query if a cursor references a leaf node in the tree.
    --
    --  A leaf node is any node in the tree that has no children.
@@ -427,7 +481,7 @@ is
      Global => null,
      Post   => (if Is_Empty (Container)
                 then Root'Result = No_Element
-                else Is_Root (Model (Container), Root'Result));
+                else Is_Root (Container, Root'Result));
    --  Get a cursor to the root of the tree.
    --
    --  No_Element is returned iff the tree is empty, otherwise a cursor to the
@@ -445,7 +499,7 @@ is
      Global => null,
      Contract_Cases =>
        (Is_Empty (Container) => Last'Result = No_Element,
-        others               => Has_Element (Model (Container), Last'Result));
+        others               => Has_Element (Container, Last'Result));
    --  Get a cursor to the last element in the tree.
 
    function Last_Element (Container : Tree) return Element_Type is
@@ -462,34 +516,16 @@ is
    with
      Global => null,
      Post   => --  The next of an invalid cursor is No_Element
-               (if not Has_Element (Model (Container), Position) then
+               (if not Has_Element (Container, Position) then
                   Next'Result = No_Element)
 
                --  If the result is not No_Element, then a valid cursor is
                --  returned.
                and then (if Next'Result /= No_Element then
-                           Has_Element (Model (Container), Position));
+                           Has_Element (Container, Position));
    --  Get the next element in the tree.
    --
    --  The next node is retrieved in depth-first order.
-
-   function Prev
-     (Container : Tree;
-      Position  : Cursor)
-      return Cursor
-   with
-     Global => null,
-     Post   => --  The prev of an invalid cursor is No_Element
-               (if not Has_Element (Model (Container), Position) then
-                  Prev'Result = No_Element)
-
-               --  If the result is not No_Element, then a valid cursor is
-               --  returned.
-               and then (if Prev'Result /= No_Element then
-                           Has_Element (Model (Container), Position));
-   --  Get the previous element in the tree.
-   --
-   --  The previous node is retrieved in reverse depth-first order.
 
    function First_Child
      (Container : Tree;
@@ -503,22 +539,27 @@ is
        --  cursor is returned.
        (First_Child'Result = No_Element)
        =
-       (not Has_Element (Model (Container), Position)
-        or else Is_Leaf (Model (Container), Position))
+       (not Has_Element (Container, Position)
+        or else Is_Leaf (Container, Position))
 
        and then
          (if First_Child'Result /= No_Element then
             --  A valid cursor is returned
-            Has_Element (Model (Container), First_Child'Result)
+            Has_Element (Container, First_Child'Result)
 
             --  The referenced node is a child of the node at Position.
-            and then Parent (Model (Container), First_Child'Result) = Position
+            and then M_Path (Container, Position) =
+                       M.Parent (M_Path (Container, First_Child'Result))
 
             --  The returned child is the first child
             and then
               (for all W in Way_Type =>
-                  (if W < Direction (Model (Container), First_Child'Result)
-                   then Child (Model (Container), Position, W) = No_Element)));
+                 (if W < M.Way_From_Parent
+                           (M_Path (Container, First_Child'Result))
+                  then
+                    not M.Contains
+                          (Model (Container),
+                           M.Child (M_Path (Container, Position), W)))));
 
    function First_Child_Element
      (Container : Tree;
@@ -526,7 +567,7 @@ is
       return Element_Type
    with
      Pre => Has_Element (Container, Position)
-            and then Has_Children (Model (Container), Position),
+            and then not Is_Leaf (Container, Position),
      Post => First_Child_Element'Result =
                Element (Container, First_Child (Container, Position));
 
@@ -542,30 +583,35 @@ is
        --  cursor is returned.
        (Last_Child'Result = No_Element)
        =
-       (not Has_Element (Model (Container), Position)
-        or else Is_Leaf (Model (Container), Position))
+       (not Has_Element (Container, Position)
+        or else Is_Leaf (Container, Position))
 
        and then
          (if Last_Child'Result /= No_Element then
             --  A valid cursor is returned
-            Has_Element (Model (Container), Last_Child'Result)
+            Has_Element (Container, Last_Child'Result)
 
             --  The referenced node is a child of the node at Position.
-            and then Parent (Model (Container), Last_Child'Result) = Position
+            and then M_Path (Container, Position) =
+                       M.Parent (M_Path (Container, Last_Child'Result))
 
             --  The returned child is the last child
             and then
               (for all W in Way_Type =>
-                 (if W > Direction (Model (Container), Last_Child'Result) then
-                    Child (Model (Container), Position, W) = No_Element)));
+                 (if W > M.Way_From_Parent
+                           (M_Path (Container, Last_Child'Result))
+                  then
+                    not M.Contains
+                          (Model (Container),
+                           M.Child (M_Path (Container, Position), W)))));
 
    function Last_Child_Element
      (Container : Tree;
       Position  : Cursor)
       return Element_Type
    with
-     Pre => Has_Element (Model (Container), Position)
-            and then Has_Children (Model (Container), Position),
+     Pre => Has_Element (Container, Position)
+            and then not Is_Leaf (Container, Position),
      Post => Equivalent_Elements
                (Last_Child_Element'Result,
                 Element (Container, Last_Child (Container, Position)));
@@ -582,11 +628,14 @@ is
        --  than the node at Position. Otherwise, No_Element is returned.
        (Next_Sibling'Result /= No_Element)
        =
-       (Has_Element (Model (Container), Position)
-        and then not Is_Root (Model (Container), Position)
-        and then (for some W in Way_Type =>
-                    W > Direction (Model (Container), Position)
-                    and then Has_Sibling (Model (Container), Position, W)))
+       (Has_Element (Container, Position)
+        and then not Is_Root (Container, Position)
+        and then
+          (for some W in Way_Type =>
+             W > M.Way_From_Parent (M_Path (Container, Position))
+             and then M.Contains
+                        (Model (Container),
+                         M.Sibling (M_Path (Container, Position), W))))
 
        --  If a non-null cursor is returned, then that cursor references the
        --  next sibling node.
@@ -595,67 +644,35 @@ is
             Has_Element (Container, Next_Sibling'Result)
 
             --  The result has the same parent as the node at Position
-            and then Parent (Model (Container), Next_Sibling'Result) =
-                     Parent (Model (Container), Position)
+            and then M.Parent (M_Path (Container, Next_Sibling'Result)) =
+                     M.Parent (M_Path (Container, Position))
 
             --  A next sibling is returned
-            and then Direction (Model (Container), Next_Sibling'Result) >
-                     Direction (Model (Container), Position)
+            and then
+              M.Way_From_Parent (M_Path (Container, Next_Sibling'Result)) =
+              M.Way_From_Parent (M_Path (Container, Position))
 
             --  The returned sibling is the closest next one.
             --  That is, there are no other siblings between the returned
             --  one and the one at Position.
             and then
               (for all W in Way_Type =>
-                 (if W < Direction (Model (Container), Next_Sibling'Result)
-                    and then W > Direction (Model (Container), Position)
-                  then not Has_Sibling (Model (Container), Position, W))));
-
-   function Prev_Sibling
-     (Container : Tree;
-      Position  : Cursor)
-      return Cursor
-   with
-     Global => null,
-     Post   =>
-       --  A non-null cursor is returned iff Position references a valid
-       --  non-root node, and there exists a sibling node with a lower way
-       --  than the node at Position. Otherwise, No_Element is returned.
-       (Prev_Sibling'Result /= No_Element)
-       =
-       (Has_Element (Model (Container), Position)
-        and then not Is_Root (Model (Container), Position)
-        and then (for some W in Way_Type =>
-                    W < Direction (Model (Container), Position)
-                    and then Has_Sibling (Model (Container), Position, W)))
-
-       --  If a non-null cursor is returned, then that cursor references the
-       --  previous sibling node.
-       and then
-         (if Prev_Sibling'Result /= No_Element then
-            Has_Element (Model (Container), Prev_Sibling'Result)
-
-            --  The result has the same parent as the node at Position
-            and then Parent (Model (Container), Prev_Sibling'Result) =
-                     Parent (Model (Container), Position)
-
-            --  A previous sibling is returned
-            and then Direction (Model (Container), Prev_Sibling'Result) <
-                     Direction (Model (Container), Position)
-
-            --  The returned sibling is the closest previous one.
-            --  That is, there are no other siblings between the returned
-            --  one and the one at Position.
-            and then
-              (for all W in Way_Type =>
-                 (if W > Direction (Model (Container), Prev_Sibling'Result)
-                    and then W < Direction (Model (Container), Position)
-                  then not Has_Sibling (Model (Container), Position, W))));
+                 (if W < M.Way_From_Parent
+                           (M_Path (Container, Next_Sibling'Result))
+                    and then W > M.Way_From_Parent
+                                   (M_Path (Container, Position))
+                  then
+                    not M.Contains
+                          (Model (Container),
+                           M.Sibling (M_Path (Container, Position), W)))));
 
    function Root_Element (Container : Tree) return Element_Type with
      Global => null,
      Pre    => not Is_Empty (Container),
-     Post   => Root_Element'Result = Element (Container, Root (Container));
+     Post   =>
+       Equivalent_Elements
+         (Root_Element'Result,
+          Element (Container, Root (Container)));
    --  Get the element at the root of the tree.
    --
    --  This may only be called when the tree is not empty.
@@ -667,12 +684,17 @@ is
    with
      Inline,
      Global => null,
-     Post   => (if not Has_Element (Model (Container), Position)
-                then Parent'Result = No_Element
-                else Parent'Result = Parent (Model (Container), Position));
-   --  Get a cursor to the parent of a node.
-   --
-   --  No_Element is returned iff the Position references the root node.
+     Post   =>
+       ((Parent'Result = No_Element) =
+          (not Has_Element (Container, Position)
+           or else Is_Root (Container, Position)))
+
+       and then
+         (if Parent'Result /= No_Element
+          then Has_Element (Container, Parent'Result)
+               and then M_Path (Container, Parent'Result) =
+                          M.Parent (M_Path (Container, Position)));
+   --  Get a cursor to the parent of a node
 
    function Child
      (Container : Tree;
@@ -682,13 +704,19 @@ is
    with
      Inline,
      Global => null,
-     Post   => (if Has_Element (Model (Container), Position)
-                then Child'Result = Child (Model (Container), Position, Way)
-                else Child'Result = No_Element);
-   --  Get a cursor to a child element of a node.
-   --
-   --  No_Element is returned if the node at the given Position does not have a
-   --  child at the specified Way.
+     Post   =>
+       ((Child'Result = No_Element) =
+          (not Has_Element (Container, Position)
+           or else
+             not M.Contains (Model (Container),
+                             M.Child (M_Path (Container, Position), Way))))
+
+       and then
+         (if Child'Result /= No_Element then
+            Has_Element (Container, Child'Result)
+            and then M_Path (Container, Child'Result) =
+                       M.Child (M_Path (Container, Position), Way));
+   --  Get a cursor to a child element of a node
 
    function Direction
      (Container : Tree;
@@ -697,10 +725,9 @@ is
    with
      Inline,
      Global => null,
+     Pre    => Has_Element (Container, Position),
      Post   =>
-       (if not Has_Element (Model (Container), Position)
-        then Direction'Result = Way_Type'First
-        else Direction'Result = Direction (Model (Container), Position));
+       Direction'Result = M.Way_From_Parent (M_Path (Container, Position));
    --  Get the direction (way) to the node at the given Position from its
    --  parent node.
 
@@ -711,11 +738,47 @@ is
       return Boolean
    with
      Global => null,
-     Pre    => Has_Element (Model (Container), Ancestor)
-               and then Has_Element (Model (Container), Child),
      Post   =>
-       Is_Ancestor'Result = Is_Ancestor (Model (Container), Ancestor, Child);
+       Is_Ancestor'Result =
+         (Has_Element (Container, Ancestor)
+          and then Has_Element (Container, Child)
+          and then M.Is_Ancestor (M_Path (Container, Ancestor),
+                                  M_Path (Container, Child))),
+     Annotate => (GNATprove, Inline_For_Proof);
    --  Query if Ancestor is an ancestor node of Child.
+
+   function In_Subtree
+     (Container    : Tree;
+      Subtree_Root : Cursor;
+      Position     : Cursor)
+      return Boolean
+   with
+     Global => null,
+     Post   => In_Subtree'Result =
+                 (Has_Element (Container, Subtree_Root)
+                  and then Has_Element (Container, Position)
+                  and then M.In_Subtree (M_Path (Container, Position),
+                                         M_Path (Container, Subtree_Root))),
+     Annotate => (GNATprove, Inline_For_Proof);
+   --  Query if the node at Position is in the subtree rooted by Subtree_Root.
+
+   function In_Branch
+     (Container    : Tree;
+      Ancestor     : Cursor;
+      Position     : Cursor;
+      Way          : Way_Type)
+      return Boolean
+   with
+     Global => null,
+     Post   =>
+       In_Branch'Result =
+         (Has_Element (Container, Ancestor)
+          and then Has_Element (Container, Position)
+          and then M.In_Subtree (M_Path (Container, Position),
+                                 M.Child (M_Path (Container, Ancestor), Way))),
+     Annotate => (GNATprove, Inline_For_Proof);
+   --  Query if the node at Position is a descendant of the specified branch
+   --  of the node at Ancestor.
 
    function Depth
      (Container : Tree;
@@ -723,8 +786,11 @@ is
       return Count_Type
    with
      Global => null,
-     Pre    => Position /= No_Element,
-     Post   => Depth'Result = Depth (Model (Container), Position);
+     Pre    => Has_Element (Container, Position),
+     Post   =>
+       Depth'Result =
+         Count_Type_Conversions.From_Big_Integer
+           (M.Length (M_Path (Container, Position)));
    --  Get the depth of a node in the tree.
    --
    --  The root node has depth 0.
@@ -739,8 +805,11 @@ is
      Pre    => Is_Empty (Container),
      Post   =>
        Length (Container) = 1
-       and then Equivalent_Elements (New_Item, Root_Element (Container))
-       and then not Has_Children (Model (Container), Root (Container));
+       and then M.Contains (Model (Container), M.Root)
+       and then M.Element_Logic_Equal
+                  (M.Get (Model (Container), M.Root),
+                   M.Copy_Element (New_Item))
+       and then M.Is_Leaf (Model (Container), M.Root);
 
    procedure Insert_Child
      (Container : in out Tree;
@@ -749,81 +818,50 @@ is
       Way       :        Way_Type)
    with
      Global => null,
-     Pre    => Has_Element (Model (Container), Position)
-               and then Length (Container) < Count_Type'Last
-               and then Child (Model (Container), Position, Way) = No_Element,
+     Pre    =>
+       Has_Element (Container, Position)
+       and then Length (Container) < Count_Type'Last
+       and then not M.Contains (Model (Container),
+                                M.Child (M_Path (Container, Position), Way)),
      Post   =>
-       --  The length of the container has incremented
+       --  One new node has been added to the tree
        Length (Container) = Length (Container'Old) + 1
 
-       --  All previous nodes are still in the tree
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
-                Has_Element (Model (Container),     To_Cursor (I))))
-
-       --  The paths to all previous nodes is unchanged
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
-               Path (Model (Container), To_Cursor (I)) =
-                 Path (Model (Container'Old), To_Cursor (I))))
-
-       --  The parents of all previous nodes are unchanged
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
-               Parent (Model (Container), To_Cursor (I)) =
-                 Parent (Model (Container'Old), To_Cursor (I))))
-
-       --  The direction to each node from its parent is unchanged
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
-               Direction (Model (Container), To_Cursor (I)) =
-                 Direction (Model (Container'Old), To_Cursor (I))))
-
-       --  The children of all nodes is unchanged, except for the node
-       --  at the specified Position.
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
-               (if To_Cursor (I) /= Position then
-                  Children (Model (Container), To_Cursor (I)) =
-                    Children (Model (Container'Old), To_Cursor (I)))))
-
-       --  The children of the node at Position are unchanged, except for
-       --  the child at the specified Way.
-       and then
-         (for all W in Way_Type =>
-            (if W /= Way then
-               Child (Model (Container), Position, W) =
-                 Child (Model (Container'Old), Position, W)))
-
-       --  The child of Position at the specified Way is now a valid node
-       and then Has_Element (Model (Container),
-                             Child (Model (Container), Position, Way))
-
-       --  The new child is a leaf
-       and then Is_Leaf (Model (Container),
-                         Child (Model (Container), Position, Way))
-
-       --  The new child has the specified element
+       --  The element at the new node is equivalent to New_Item
+       and then M.Element_Logic_Equal
+                  (M.Get (Model (Container),
+                          M.Child (M_Path (Container, Position), Way)),
+                   M.Copy_Element (New_Item))
        and then
          Equivalent_Elements
-           (Element (Container, Child (Model (Container), Position, Way)),
-            New_Item)
+           (New_Item,
+            Element (Container, Child (Container, Position, Way)))
 
-       --  All previous elements are unchanged
+       --  All previous elements are unchanged in the formal model
+       and then M.Elements_Equal (Model (Container'Old), Model (Container))
+
        and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
-               Equivalent_Elements
-                 (Element (Container,     To_Cursor (I)),
-                  Element (Container'Old, To_Cursor (I)))))
+         M.Nodes_Included_Except_Subtree
+           (Left          => Model (Container),
+            Right         => Model (Container'Old),
+            Excluded_Node => M.Child (M_Path (Container'Old, Position), Way))
 
-       --  The root of the tree has not changed.
-       and then Root (Container) = Root (Container'Old);
+       --  The node at Position now has a child at the specified Way
+       and then Has_Element (Container, Child (Container, Position, Way))
+
+       --  The new child has no children of its own
+       and then Is_Leaf (Container, Child (Container, Position, Way))
+
+       --  The root of the tree is unchanged
+       and then Root (Container) = Root (Container'Old)
+
+       --  The mappings of all previous valid cursors to paths in the formal
+       --  model is the same as before, except for the addition of the new
+       --  child node.
+       and then Same_Mapping_Except
+                  (Left     => Container'Old,
+                   Right    => Container,
+                   Position => Child (Container, Position, Way));
 
    procedure Insert_Parent
      (Container : in out Tree;
@@ -835,92 +873,71 @@ is
      Pre    => Has_Element (Container, Position)
                and then Length (Container) < Count_Type'Last,
      Post   =>
-       --  The length of the container has increased by one
+       --  One new node has been added to the tree
        Length (Container) = Length (Container'Old) + 1
 
-       --  The new node has the specified element
+       --  The new node is inserted as the parent of the node at Position
+       and then Has_Element (Container, Parent (Container, Position))
+       and then M_Path (Container, Parent (Container, Position)) =
+                M_Path (Container'Old, Position)
+
+       --  The element at the new node is equivalent to New_Item
+       and then M.Element_Logic_Equal
+                  (M.Copy_Element (New_Item),
+                   M.Get (Model (Container), M_Path (Container'Old, Position)))
        and then
          Equivalent_Elements
            (New_Item,
-            Element (Container, Parent (Model (Container), Position)))
+            Element (Container, Parent (Container, Position)))
 
-       --  All previous nodes still exist
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
-                Has_Element (Model (Container),     To_Cursor (I))))
+       --  All previous nodes and elements not in the affected subtree are
+       --  unchanged.
+       and then M.Elements_Equal_Except_Subtree
+                  (Model (Container'Old),
+                   Model (Container),
+                   M_Path (Container'Old, Position))
 
-       --  All previously existing elements are unmodified
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
-               Equivalent_Elements
-                 (Element (Container,     To_Cursor (I)),
-                  Element (Container'Old, To_Cursor (I)))))
+       --  The position of elements in the affected subtree is shifted by
+       --  the insertion of the new parent node.
+       and then M.Subtree_Elements_Shifted
+                  (Left         => Model (Container'Old),
+                   Right        => Model (Container),
+                   Subtree_Root => M_Path (Container'Old, Position),
+                   Way          => Way)
 
-       --  All nodes not in the subtree rooted by the node at Position,
-       --  or the previous parent of Position, are unchanged.
+       --  The root of the tree is unchanged, unless the node at Position was
+       --  the root in which case the new parent node becomes the root.
        and then
-         (for all I in Valid_Cursor_Range =>
-            (if not In_Subtree (Model (Container'Old), Position, To_Cursor (I))
-                and then
-                  To_Cursor (I) /= Parent (Model (Container'Old), Position)
-             then Model (Container) (I) = Model (Container'Old) (I)))
+         (if Root (Container'Old) = Position
+          then Root (Container) = Parent (Container, Position)
+          else Root (Container) = Root (Container'Old))
 
-       --  The paths to all nodes not in the affected subtree are unchanged
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
-               (if not In_Subtree
-                         (Model (Container'Old), Position, To_Cursor (I))
-                then Path (Model (Container),     To_Cursor (I)) =
-                     Path (Model (Container'Old), To_Cursor (I)))))
+       --  All cursors are preserved, except for the insertion of a new cursor
+       --  that references the new parent.
+       and then P.Keys_Included (Paths (Container'Old), Paths (Container))
+       and then P.Keys_Included_Except
+                  (Paths (Container),
+                   Paths (Container'Old),
+                   Parent (Container, Position))
 
-       --  The parents of all nodes is unchanged, except for the node at
-       --  Position.
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I))
-                and then To_Cursor (I) /= Position
-             then Parent (Model (Container), To_Cursor (I)) =
-                  Parent (Model (Container'Old), To_Cursor (I))))
+       --  The mapping of cursors to paths in the formal model is preserved
+       --  for all nodes that are not in the affected subtree
+       and then Mapping_Preserved_Except_Subtree
+                  (Left     => Container'Old,
+                   Right    => Container,
+                   Position => Position)
 
-       --  The children of all nodes in the tree are unchanged, except for
-       --  the old parent of the node at Position.
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I)) then
-               (if To_Cursor (I) /= Parent (Model (Container'Old), Position)
-                then Children (Model (Container),     To_Cursor (I)) =
-                     Children (Model (Container'Old), To_Cursor (I)))))
+       --  Cursors in the affected subtree are remapped to new paths in the
+       --  formal model as a result of the insertion of the new parent node.
+       and then Subtree_Mapping_Shifted
+                  (Left         => Container'Old,
+                   Right        => Container,
+                   Subtree_Root => M_Path (Container'Old, Position),
+                   Way          => Way)
 
-       --  The children of the old parent of Position are unchanged, except
-       --  for the child at Position which no longer references Position.
-       and then
-         (if not Is_Root (Model (Container), Position) then
-            (for all W in Way_Type =>
-               (if W /= Direction (Model (Container'Old), Position) then
-                  Child (Model (Container),
-                         Parent (Model (Container'Old), Position),
-                         W)
-                  = Child (Model (Container'Old),
-                           Parent (Model (Container'Old), Position),
-                           W))))
-
-       --  The parent of the node at Position is now its grandparent
-       and then
-         Parent (Model (Container), Parent (Model (Container), Position)) =
-           Parent (Model (Container'Old), Position)
-
-       --  If the node at Position was the root, then it is not longer the root
-       --  and its parent is the root. Otherwise, the root is unchanged.
-       and then
-         (if Is_Root (Model (Container'Old), Position)
-          then not Is_Root (Model (Container), Position)
-               and then Is_Root (Model (Container),
-                                 Parent (Model (Container), Position))
-               and then Root (Container) = Parent (Model (Container), Position)
-          else Root (Container) = Root (Container'Old));
+       --  Nodes that were ancestors of other nodes are still their ancestors
+       --  in the updated tree.
+       and then Ancestry_Preserved (Container'Old, Container);
    --  Insert a new item as a parent of the node at the specified Position.
    --
    --  For example, adding node F as the parent of C changes the tree as
@@ -938,146 +955,34 @@ is
       Position  :        Cursor)
    with
      Global => null,
-     Pre    => Has_Element (Model (Container), Position),
+     Pre    => Has_Element (Container, Position),
      Post   =>
+       --  The length of the container has decreased
        Length (Container) < Length (Container'Old)
 
-       --  All nodes not in the deleted subtree are preserved
        and then
-         (for all I in Valid_Cursor_Range =>
-            Has_Element (Model (Container), To_Cursor (I)) =
-            (Has_Element (Model (Container'Old), To_Cursor (I))
-             and then not In_Subtree
-                            (Model (Container'Old), Position, To_Cursor (I))))
+         Model (Container) =
+           M.Remove (Model (Container'Old), M_Path (Container'Old, Position))
 
-       --  The elements and tree structure of all nodes not in the affected
-       --  subtree are preserved.
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I))
-                and then not In_Subtree
-                               (Model (Container'Old), Position, To_Cursor (I))
-             then Equivalent_Elements
-                    (Element (Container,     To_Cursor (I)),
-                     Element (Container'Old, To_Cursor (I)))
-                  and then Parent (Model (Container),     To_Cursor (I)) =
-                           Parent (Model (Container'Old), To_Cursor (I))
-                  and then Path (Model (Container),     To_Cursor (I)) =
-                           Path (Model (Container'Old), To_Cursor (I))))
+       --  The referenced node is now deleted
+       and then not Has_Element (Container, Position)
 
-       --  The children of all nodes not in the affected subtree is preserved,
-       --  except for the parent of the affected subtree which no longer has
-       --  a child in the direction of the deleted subtree.
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container'Old), To_Cursor (I))
-                and then not In_Subtree
-                               (Model (Container'Old), Position, To_Cursor (I))
-             then (if To_Cursor (I) = Parent (Model (Container'Old), Position)
-                   then Children (Model (Container), To_Cursor (I)) =
-                        (Children (Model (Container'Old), To_Cursor (I))
-                         with delta
-                           Direction (Model (Container'Old), Position) =>
-                             No_Element))
-                   else Children (Model (Container),     To_Cursor (I)) =
-                        Children (Model (Container'Old), To_Cursor (I))));
+       --  If the root was deleted then the tree is now empty. Otherwise, the
+       --  root is preserved.
+       and then (if Position = Root (Container'Old)
+                 then Is_Empty (Container)
+                 else Root (Container) = Root (Container'Old))
+
+       --  The mapping of cursors to paths in the formal model is the same,
+       --  except for the deleted subtree.
+       and then Mapping_Preserved (Container, Container'Old)
+       and then Same_Mapping_Except_Subtree
+                  (Left     => Container'Old,
+                   Right    => Container,
+                   Position => Position);
    --  Delete a node from the tree.
    --
    --  If the node has any child nodes then they are also deleted.
-
-   procedure Move_Subtree
-     (Container    : in out Tree;
-      Subtree_Root :        Cursor;
-      New_Parent   :        Cursor;
-      Way          :        Way_Type)
-   with
-     Global => null,
-     Pre    =>
-       Has_Element (Container, Subtree_Root)
-       and then Has_Element (Container, New_Parent)
-
-       --  The child slot in the new parent must be empty
-       --  (cannot overwrite an existing node).
-       and then Child (Model (Container), New_Parent, Way) = No_Element
-
-       --  The new parent cannot be in the subtree that is being moved
-       --  as this would lead to a cycle in the tree.
-       and then not In_Subtree (Model (Container), New_Parent, Subtree_Root),
-     Post =>
-       --  No nodes are added or removed
-       Length (Container) = Length (Container'Old)
-       and then (for all I in Valid_Cursor_Range =>
-                   Has_Element (Model (Container),     To_Cursor (I)) =
-                   Has_Element (Model (Container'Old), To_Cursor (I)))
-
-       --  All elements are unchanged
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if Has_Element (Model (Container), To_Cursor (I)) then
-               Equivalent_Elements
-                 (Element (Container,     To_Cursor (I)),
-                  Element (Container'Old, To_Cursor (I)))))
-
-       --  The path to all nodes not in the subtree is unchanged
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if not In_Subtree
-                      (Model (Container'Old), Subtree_Root, To_Cursor (I))
-             then Path (Model (Container), To_Cursor (I)) =
-                  Path (Model (Container'Old), To_Cursor (I))))
-
-       --  The parent of all nodes is unchanged, except for Subtree_Root
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if To_Cursor (I) /= Subtree_Root then
-               Parent (Model (Container),     To_Cursor (I)) =
-               Parent (Model (Container'Old), To_Cursor (I))))
-
-       --  The subtree root has a new parent
-       and then Parent (Model (Container), Subtree_Root) = New_Parent
-
-       --  The paths of all nodes not in the subtree are unchanged
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (if not In_Subtree
-                      (Model (Container'Old), Subtree_Root, To_Cursor (I))
-             then Path (Model (Container),     To_Cursor (I)) =
-                  Path (Model (Container'Old), To_Cursor (I))))
-
-       --  The paths between all nodes in the subtree is preserved
-       and then
-         (for all I in Valid_Cursor_Range =>
-            (for all J in Valid_Cursor_Range =>
-               (if In_Subtree (Model (Container'Old),
-                               Subtree_Root,
-                               To_Cursor (I))
-                   and then Is_Ancestor (Model (Container'Old),
-                                         To_Cursor (I),
-                                         To_Cursor (J))
-                then Is_Ancestor (Model (Container),
-                                  To_Cursor (I),
-                                  To_Cursor (J)))))
-
-       --  If the subtree is being spliced to a different parent, then the
-       --  subtree root is removed as the child of its old parent.
-       and then
-         (if Parent (Model (Container'Old), Subtree_Root) /= New_Parent then
-            Child (Model (Container),
-                   Parent (Model (Container'Old), Subtree_Root),
-                   Direction (Model (Container'Old), Subtree_Root))
-            = No_Element);
-   --  Move a subtree rooted by the element at Position to another node in the
-   --  tree.
-   --
-   --  For example, moving the subtree rooted at node C to be a child of
-   --  node B:
-   --         A              A
-   --        / \            /
-   --       B   C    ===>  B
-   --          / \          \
-   --         D   E          C
-   --                       / \
-   --                      D   E
 
    function At_End (E : access constant Tree) return access constant Tree is
      (E)
@@ -1114,19 +1019,24 @@ is
      Global => null,
      Pre    => Has_Element (Container.all, Position),
      Post   => --  The tree structure is preserved
-               Model (Container.all'Old) = Model (At_End (Container).all)
+               M.Same_Nodes (Model (Container.all), Model (Container.all'Old))
 
                --  The length is preserved
                and then Length (Container.all) = Length (Container.all'Old)
 
-               --  Other elements are preserved
-               and then
-                 (for all I in Valid_Cursor_Range =>
-                    (if Model (Container.all'Old) (I).In_Tree
-                        and then I /= Position.Node
-                     then Equivalent_Elements
-                            (Element (Container.all'Old, To_Cursor (I)),
-                             Element (Container.all, To_Cursor (I)))))
+               --  The values of all other elements are preserved
+               and then M.Elements_Equal_Except
+                          (Model (Container.all),
+                           Model (Container.all'Old),
+                           M_Path (Container.all, Position))
+
+               --  Mapping from cursors to Model nodes is preserved
+               and then Mapping_Preserved
+                          (Left  => Container.all,
+                           Right => Container.all'Old)
+               and then Mapping_Preserved
+                          (Left  => Container.all'Old,
+                           Right => Container.all)
 
                --  The value designated by the result of Reference is now
                --  equivalent to the element at the specified Position in the
@@ -1184,7 +1094,7 @@ private
       --  False if this node is in use.
    end record;
 
-   package Node_Vectors is new SPARK.Containers.Formal.Unbounded_Vectors
+   package Node_Vectors is new Ada.Containers.Vectors
      (Index_Type   => Index_Type,
       Element_Type => Node_Type,
       "="          => "=");

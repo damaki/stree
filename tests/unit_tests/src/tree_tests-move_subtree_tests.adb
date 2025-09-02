@@ -288,16 +288,26 @@ package body Tree_Tests.Move_Subtree_Tests is
 
    procedure Add_To_Suite (S : in out Test_Suite'Class) is
    begin
-      S.Add_Test (Caller.Create ("Move_Subtree (Single node)",
-                                 Test_Move_Subtree_Single_Node'Access));
-      S.Add_Test (Caller.Create ("Move_Subtree (Multiple nodes)",
-                                 Test_Move_Subtree_Multiple_Nodes'Access));
-      S.Add_Test (Caller.Create ("Move_Subtree (Invalid Subtree_Root)",
-                                 Test_Move_Subtree_Bad_Subtree_Root'Access));
-      S.Add_Test (Caller.Create ("Move_Subtree (Invalid New_Parent)",
-                                 Test_Move_Subtree_Bad_New_Parent'Access));
-      S.Add_Test (Caller.Create ("Move_Subtree (Cycle)",
-                                 Test_Move_Subtree_Cyclic_Tree'Access));
+      S.Add_Test
+        (Caller.Create
+           ("Unbounded_Multiway_Trees.Move_Subtree (Single node)",
+            Test_Move_Subtree_Single_Node'Access));
+      S.Add_Test
+        (Caller.Create
+           ("Unbounded_Multiway_Trees.Move_Subtree (Multiple nodes)",
+            Test_Move_Subtree_Multiple_Nodes'Access));
+      S.Add_Test
+        (Caller.Create
+           ("Unbounded_Multiway_Trees.Move_Subtree (Invalid Subtree_Root)",
+            Test_Move_Subtree_Bad_Subtree_Root'Access));
+      S.Add_Test
+        (Caller.Create
+           ("Unbounded_Multiway_Trees.Move_Subtree (Invalid New_Parent)",
+            Test_Move_Subtree_Bad_New_Parent'Access));
+      S.Add_Test
+        (Caller.Create
+           ("Unbounded_Multiway_Trees.Move_Subtree (Cycle)",
+            Test_Move_Subtree_Cyclic_Tree'Access));
    end Add_To_Suite;
 
 end Tree_Tests.Move_Subtree_Tests;

@@ -250,14 +250,18 @@ package body Tree_Tests.Delete_Tests is
 
    procedure Add_To_Suite (S : in out Test_Suite'Class) is
    begin
-      S.Add_Test (Caller.Create ("Delete (Leaf node)",
-                                 Test_Delete_Leaf_Node'Access));
-      S.Add_Test (Caller.Create ("Delete (Subtree)",
-                                 Test_Delete_Subtree'Access));
-      S.Add_Test (Caller.Create ("Delete (Root node)",
-                                 Test_Delete_Entire_Tree'Access));
-      S.Add_Test (Caller.Create ("Delete (Invalid cursor)",
-                                 Test_Delete_Invalid_Cursor'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Delete (Leaf node)",
+                     Test_Delete_Leaf_Node'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Delete (Subtree)",
+                     Test_Delete_Subtree'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Delete (Root node)",
+                     Test_Delete_Entire_Tree'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Delete (Invalid cursor)",
+                     Test_Delete_Invalid_Cursor'Access));
    end Add_To_Suite;
 
 end Tree_Tests.Delete_Tests;

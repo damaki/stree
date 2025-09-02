@@ -49,10 +49,12 @@ package body Tree_Tests.Root_Element_Tests is
 
    procedure Add_To_Suite (S : in out Test_Suite'Class) is
    begin
-      S.Add_Test (Caller.Create ("Root_Element (Non Empty)",
-                                 Test_Root_Element_Non_Empty'Access));
-      S.Add_Test (Caller.Create ("Root_Element (Empty)",
-                                 Test_Root_Element_Empty'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Root_Element (Non Empty)",
+                     Test_Root_Element_Non_Empty'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Root_Element (Empty)",
+                     Test_Root_Element_Empty'Access));
    end Add_To_Suite;
 
 end Tree_Tests.Root_Element_Tests;

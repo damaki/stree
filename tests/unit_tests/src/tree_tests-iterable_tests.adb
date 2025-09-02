@@ -78,10 +78,12 @@ package body Tree_Tests.Iterable_Tests is
 
    procedure Add_To_Suite (S : in out Test_Suite'Class) is
    begin
-      S.Add_Test (Caller.Create ("Iterable (Empty)",
-                                 Test_Iterable_Empty'Access));
-      S.Add_Test (Caller.Create ("Iterable (Valid tree)",
-                                 Test_Iterable_Valid_Tree'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Iterable (Empty)",
+                     Test_Iterable_Empty'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Iterable (Valid tree)",
+                     Test_Iterable_Valid_Tree'Access));
    end Add_To_Suite;
 
 end Tree_Tests.Iterable_Tests;

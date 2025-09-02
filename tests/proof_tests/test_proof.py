@@ -107,6 +107,7 @@ class TestCase:
             "--no-subprojects",
             "--report=all",
             "--warnings=error",
+            "--proof-warnings",
             "--checks-as-errors=on", # Returns non-zero exit code when there are unproved checks
         ]
 

@@ -102,12 +102,15 @@ package body Tree_Tests.Next_Tests is
 
    procedure Add_To_Suite (S : in out Test_Suite'Class) is
    begin
-      S.Add_Test (Caller.Create ("Next (No_Element)",
-                                 Test_Next_No_Element'Access));
-      S.Add_Test (Caller.Create ("Next (Invalid cursor)",
-                                 Test_Next_Invalid_Cursor'Access));
-      S.Add_Test (Caller.Create ("Next (Valid tree)",
-                                 Test_Next_Valid_Tree'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Next (No_Element)",
+                     Test_Next_No_Element'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Next (Invalid cursor)",
+                     Test_Next_Invalid_Cursor'Access));
+      S.Add_Test (Caller.Create
+                    ("Unbounded_Multiway_Trees.Next (Valid tree)",
+                     Test_Next_Valid_Tree'Access));
    end Add_To_Suite;
 
 end Tree_Tests.Next_Tests;
