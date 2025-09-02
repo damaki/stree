@@ -277,9 +277,25 @@ is
       -----------
 
       function Model (Container : Tree) return M.Tree is
-         pragma Unreferenced (Container);
+         Result : M.Tree := M.Empty_Tree;
+         Node   : Cursor := Container.Root;
       begin
-         return M.Empty_Tree; --  TODO
+         while Node /= No_Element loop
+            declare
+               Node_Acc : constant access constant Node_Type :=
+                            Node_Vectors.Constant_Reference
+                              (Container.Nodes, Node.Node).Element;
+            begin
+               Result :=
+                 M.Add (Container => Result,
+                        New_Item  => Node_Acc.all.Element,
+                        New_Node  => Get_Path (Container.Nodes, Node.Node));
+            end;
+
+            Node := Next_Impl (Container, Node);
+         end loop;
+
+         return Result;
       end Model;
 
       ------------
