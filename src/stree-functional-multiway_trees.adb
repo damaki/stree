@@ -314,6 +314,9 @@ is
    -- Choose --
    ------------
 
+   --  Choose always returns a leaf node so that we can always delete exactly
+   --  one node from the Cursor when iterating over Iterable_Map.
+
    function Choose (Container : Tree) return Path_Type is
    begin
       if Container.Ref.Ref = null then
