@@ -319,8 +319,48 @@ is
          return (L_Node = L_Last) and then (R_Node = R_Last);
       end Subtree_Remapped;
 
+      ------------------------
+      -- Ancestry_Preserved --
+      ------------------------
+
       function Ancestry_Preserved (Left, Right : Tree) return Boolean is
-        (True);
+         C1 : Cursor;
+         C2 : Cursor;
+
+      begin
+         --  Check that every cursor in Left is in Right
+         C1 := Left.Root;
+         while C1 /= No_Element loop
+            if not Has_Element (Right, C1) then
+               return False;
+            end if;
+            C1 := Next_Impl (Left, C1);
+         end loop;
+
+         --  Check ancestry of every combination of nodes. There's probably a
+         --  more efficient way to check the property, but since this is a
+         --  Ghost function it's unlikely this will be used outside of testing.
+
+         C1 := Left.Root;
+
+         while C1 /= No_Element loop
+            C2 := Left.Root;
+
+            while C2 /= No_Element loop
+               if Is_Ancestor (Left, C1, C2) then
+                  if not Is_Ancestor (Right, C1, C2) then
+                     return False;
+                  end if;
+               end if;
+
+               C2 := Next_Impl (Left, C2);
+            end loop;
+
+            C1 := Next_Impl (Left, C1);
+         end loop;
+
+         return True;
+      end Ancestry_Preserved;
 
       -----------
       -- Paths --
