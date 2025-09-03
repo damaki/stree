@@ -14,6 +14,18 @@ is
      Ghost;
    --  Get the path to a node
 
+   function Find_Node
+     (Container : Tree;
+      Path      : M.Path_Type) return Cursor
+   with
+     Ghost;
+   --  Find the node in the tree with the specified path
+
+   function Last_Node_In_Subtree
+     (Container : Tree;
+      Position  : Cursor) return Cursor;
+   --  Get the last node that will be visited in the subtree when iterating
+
    function Same_Path
      (Left, Right : Tree;
       L_Position : Cursor;
@@ -251,12 +263,61 @@ is
            Old_Subtree => Subtree_Root,
            New_Subtree => M.Child (Subtree_Root, Way)));
 
+      ----------------------
+      -- Subtree_Remapped --
+      ----------------------
+
       function Subtree_Remapped
         (Left, Right : Tree;
          Old_Subtree : M.Path_Type;
          New_Subtree : M.Path_Type) return Boolean
       is
-        (True);
+         L_Node : Cursor;
+         R_Node : Cursor;
+
+         L_Last : Cursor;
+         R_Last : Cursor;
+      begin
+         L_Node := Find_Node (Left,  Old_Subtree);
+         R_Node := Find_Node (Right, New_Subtree);
+
+         if L_Node = No_Element or else R_Node = No_Element then
+            return (L_Node = No_Element) and then (R_Node = No_Element);
+         elsif L_Node /= R_Node then
+            return False;
+         end if;
+
+         --  Iterate through each node in the subtree and verify that the
+         --  cursors are the same at each step, and they have the same path
+         --  from their parent.
+
+         L_Last := Last_Node_In_Subtree (Left,  L_Node);
+         R_Last := Last_Node_In_Subtree (Right, R_Node);
+
+         if (L_Node /= L_Last) and then (R_Node /= R_Last) then
+
+            --  Don't test the first node, as it is the subtree root.
+
+            L_Node := Next (Left,  L_Node);
+            R_Node := Next (Right, R_Node);
+
+            loop
+               if L_Node /= R_Node
+                  or else Direction (Left, L_Node) /= Direction (Right, R_Node)
+                  or else Parent (Left, L_Node) /= Parent (Right, R_Node)
+               then
+                  return False;
+               end if;
+
+               exit when L_Node = L_Last or else R_Node = R_Last;
+
+               L_Node := Next (Left,  L_Node);
+               R_Node := Next (Right, R_Node);
+            end loop;
+         end if;
+
+         return (L_Node = L_Last) and then (R_Node = R_Last);
+      end Subtree_Remapped;
 
       function Ancestry_Preserved (Left, Right : Tree) return Boolean is
         (True);
@@ -488,19 +549,7 @@ is
    ----------
 
    function Last (Container : Tree) return Cursor is
-      Node : Cursor;
-      Next : Cursor;
-   begin
-      Node := Container.Root;
-
-      while Node /= No_Element loop
-         Next := Last_Child (Container, Node);
-         exit when Next = No_Element;
-         Node := Next;
-      end loop;
-
-      return Node;
-   end Last;
+     (Last_Node_In_Subtree (Container, Container.Root));
 
    ----------
    -- Next --
@@ -1269,5 +1318,46 @@ is
 
       return Next;
    end Next_Sibling_Impl;
+
+   ---------------
+   -- Find_Node --
+   ---------------
+
+   function Find_Node
+     (Container : Tree;
+      Path      : M.Path_Type) return Cursor
+   is
+      C : Cursor                         := Container.Root;
+      I : SPARK.Big_Integers.Big_Integer := 1;
+
+   begin
+      while C /= No_Element and then I <= M.Length (Path) loop
+         C := Child (Container, C, M.Get (Path, I));
+         I := I + 1;
+      end loop;
+
+      return C;
+   end Find_Node;
+
+   --------------------------
+   -- Last_Node_In_Subtree --
+   --------------------------
+
+   function Last_Node_In_Subtree
+     (Container : Tree;
+      Position  : Cursor) return Cursor
+   is
+      Node : Cursor := Position;
+      Next : Cursor;
+
+   begin
+      while Node /= No_Element loop
+         Next := Last_Child (Container, Node);
+         exit when Next = No_Element;
+         Node := Next;
+      end loop;
+
+      return Node;
+   end Last_Node_In_Subtree;
 
 end Stree.Unbounded_Multiway_Trees;
