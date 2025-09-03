@@ -236,12 +236,20 @@ is
          return True;
       end Same_Mapping_Except_Subtree;
 
+      -----------------------------
+      -- Subtree_Mapping_Shifted --
+      -----------------------------
+
       function Subtree_Mapping_Shifted
         (Left, Right  : Tree;
          Subtree_Root : M.Path_Type;
          Way          : Way_Type) return Boolean
       is
-        (True);
+        (Subtree_Remapped
+          (Left        => Left,
+           Right       => Right,
+           Old_Subtree => Subtree_Root,
+           New_Subtree => M.Child (Subtree_Root, Way)));
 
       function Subtree_Remapped
         (Left, Right : Tree;
