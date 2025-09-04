@@ -737,10 +737,6 @@ is
 
          if C_T.Ref.all.Refcount = 0 then
 
-            --  Iterate through the tree and free each node. Note that the
-            --  iteration is performed depth-first, so child nodes will always
-            --  be freed before their parent.
-
             Node := First_Node (C_T.Ref.all.Root_Node);
 
             while Node /= null loop
@@ -1370,7 +1366,7 @@ is
    begin
       --  Walk up the tree towards the root, building the path as we go
 
-      while N /= null loop
+      while N /= null and then N.all.Parent /= null loop
          Path := WS.Add (Path, 1, N.all.Way_From_Parent);
          N    := N.all.Parent;
       end loop;
