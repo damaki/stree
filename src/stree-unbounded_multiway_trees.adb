@@ -48,17 +48,45 @@ is
       Node      :        Cursor);
    --  Add a node (and its children) to the free list
 
+   --  The following _Impl subprograms are versions of the subprograms
+   --  without contracts so that they can be safely called from any subprogram
+   --  without the risk of introducing accidental unbounded recursion via
+   --  subprogram calls in contracts.
+   --
+   --  For example, the function Model can't call function Next in its
+   --  implementation, since Next calls Model in its postcondition (indirectly
+   --  via function Positions). Model can, however, call Next_Impl since that
+   --  function doesn't cause recursion.
+
+   function Has_Element_Impl
+     (Container : Tree;
+      Position  : Cursor) return Boolean;
+   --  Implementation of Has_Element but without contracts
+
    function First_Impl (Container : Tree) return Cursor;
+   --  Implementation of First but without contracts
+
+   function Parent_Impl
+     (Container : Tree;
+      Position  : Cursor) return Cursor;
+   --  Implementation of Parent but without contracts
 
    function Next_Impl
      (Container : Tree;
       Position  : Cursor) return Cursor;
+   --  Implementation of Next but without contracts
+
+   function First_Child_Impl
+     (Container : Tree;
+      Position  : Cursor) return Cursor;
+   --  Implementation of First_Child but without contracts
 
    function Next_Sibling_Impl
      (Container : Tree;
       Position  : Cursor) return Cursor
    with
-     Pre => Has_Element (Container, Position);
+     Pre => Has_Element_Impl (Container, Position);
+   --  Implementation of Next_Sibling but without contracts
 
    ------------------
    -- Formal_Model --
@@ -86,11 +114,11 @@ is
 
             --  Skip over freed nodes
 
-            if Has_Element (Left, L) then
+            if Has_Element_Impl (Left, L) then
 
                --  Check that the same cursor exists in Right.
 
-               if not Has_Element (Right, R) then
+               if not Has_Element_Impl (Right, R) then
                   return False;
                end if;
 
@@ -121,13 +149,13 @@ is
 
             --  Skip over freed nodes, and nodes in the specified subtree
 
-            if Has_Element (Left, L)
+            if Has_Element_Impl (Left, L)
                and then not In_Subtree (Left, Position, L)
             then
 
                --  Check that the same cursor exists in Right.
 
-               if not Has_Element (Right, R) then
+               if not Has_Element_Impl (Right, R) then
                   return False;
                end if;
 
@@ -158,11 +186,11 @@ is
 
             --  Skip over freed nodes, and the specified node
 
-            if L /= Position and then Has_Element (Left, L) then
+            if L /= Position and then Has_Element_Impl (Left, L) then
 
                --  Check that the same cursor exists in Right.
 
-               if not Has_Element (Right, R) then
+               if not Has_Element_Impl (Right, R) then
                   return False;
                end if;
 
@@ -183,7 +211,7 @@ is
                      Node_Vectors.Last_Index (Right.Nodes)
             loop
                if I /= Position.Node
-                  and then Has_Element (Right, Cursor'(Node => I))
+                  and then Has_Element_Impl (Right, Cursor'(Node => I))
                then
                   return False;
                end if;
@@ -209,13 +237,13 @@ is
 
             --  Skip over freed nodes, and nodes in the specified subtree
 
-            if Has_Element (Left, L)
+            if Has_Element_Impl (Left, L)
                and then not In_Subtree (Left, Position, L)
             then
 
                --  Check that the same cursor exists in Right.
 
-               if not Has_Element (Right, R) then
+               if not Has_Element_Impl (Right, R) then
                   return False;
                end if;
 
@@ -237,7 +265,7 @@ is
                      Node_Vectors.Last_Index (Right.Nodes)
             loop
                R := Cursor'(Node => I);
-               if Has_Element (Right, R)
+               if Has_Element_Impl (Right, R)
                   and then not In_Subtree (Right, Position, R)
                then
                   return False;
@@ -303,8 +331,10 @@ is
 
             loop
                if L_Node /= R_Node
-                  or else Direction (Left, L_Node) /= Direction (Right, R_Node)
-                  or else Parent (Left, L_Node) /= Parent (Right, R_Node)
+                  or else
+                    Direction (Left, L_Node) /= Direction (Right, R_Node)
+                  or else
+                    Parent_Impl (Left, L_Node) /= Parent_Impl (Right, R_Node)
                then
                   return False;
                end if;
@@ -331,7 +361,7 @@ is
          --  Check that every cursor in Left is in Right
          C1 := Left.Root;
          while C1 /= No_Element loop
-            if not Has_Element (Right, C1) then
+            if not Has_Element_Impl (Right, C1) then
                return False;
             end if;
             C1 := Next_Impl (Left, C1);
@@ -416,7 +446,7 @@ is
          Position  : Cursor) return M.Path_Type
       is
       begin
-         if not Has_Element (Container, Position) then
+         if not Has_Element_Impl (Container, Position) then
             raise Constraint_Error;
          end if;
 
@@ -477,6 +507,16 @@ is
       Position  : Cursor)
       return Boolean
    is
+     (Has_Element_Impl (Container, Position));
+
+   ----------------------
+   -- Has_Element_Impl --
+   ----------------------
+
+   function Has_Element_Impl
+     (Container : Tree;
+      Position  : Cursor) return Boolean
+   is
    begin
       if Position.Node not in 1 .. Node_Vectors.Last_Index (Container.Nodes)
       then
@@ -491,7 +531,7 @@ is
       begin
          return not Node_Acc.all.Free;
       end;
-   end Has_Element;
+   end Has_Element_Impl;
 
    -------------
    -- Element --
@@ -514,7 +554,7 @@ is
       New_Item  :        Element_Type)
    is
    begin
-      if not Has_Element (Container, Position) then
+      if not Has_Element_Impl (Container, Position) then
          raise Constraint_Error with "Invalid cursor";
       end if;
 
@@ -550,7 +590,7 @@ is
       return Boolean
    is
    begin
-      if not Has_Element (Container, Position) then
+      if not Has_Element_Impl (Container, Position) then
          return False;
       end if;
 
@@ -611,8 +651,19 @@ is
       Position  : Cursor)
       return Cursor
    is
+     (First_Child_Impl (Container, Position));
+
+   ----------------------
+   -- First_Child_Impl --
+   ----------------------
+
+   function First_Child_Impl
+     (Container : Tree;
+      Position  : Cursor)
+      return Cursor
+   is
    begin
-      if not Has_Element (Container, Position) then
+      if not Has_Element_Impl (Container, Position) then
          return No_Element;
       end if;
 
@@ -630,7 +681,7 @@ is
       end;
 
       return No_Element;
-   end First_Child;
+   end First_Child_Impl;
 
    -------------------------
    -- First_Child_Element --
@@ -641,7 +692,7 @@ is
       Position  : Cursor)
       return Element_Type
    is
-      Node : constant Cursor := First_Child (Container, Position);
+      Node : constant Cursor := First_Child_Impl (Container, Position);
    begin
       if Node = No_Element then
          raise Constraint_Error with "Node has no children";
@@ -660,7 +711,7 @@ is
       return Cursor
    is
    begin
-      if not Has_Element (Container, Position) then
+      if not Has_Element_Impl (Container, Position) then
          return No_Element;
       end if;
 
@@ -708,7 +759,7 @@ is
       return Cursor
    is
    begin
-      if not Has_Element (Container, Position) then
+      if not Has_Element_Impl (Container, Position) then
          return No_Element;
       end if;
 
@@ -737,8 +788,19 @@ is
       Position  : Cursor)
       return Cursor
    is
+     (Parent_Impl (Container, Position));
+
+   -----------------
+   -- Parent_Impl --
+   -----------------
+
+   function Parent_Impl
+     (Container : Tree;
+      Position  : Cursor)
+      return Cursor
+   is
    begin
-      if not Has_Element (Container, Position) then
+      if not Has_Element_Impl (Container, Position) then
          return No_Element;
       else
          declare
@@ -750,7 +812,7 @@ is
             return Node_Acc.all.Parent;
          end;
       end if;
-   end Parent;
+   end Parent_Impl;
 
    -----------
    -- Child --
@@ -763,7 +825,7 @@ is
       return Cursor
    is
    begin
-      if not Has_Element (Container, Position) then
+      if not Has_Element_Impl (Container, Position) then
          return No_Element;
       else
          declare
@@ -788,7 +850,7 @@ is
       return Cursor
    is
    begin
-      if not Has_Element (Container, Position) then
+      if not Has_Element_Impl (Container, Position) then
          return No_Element;
       else
          declare
@@ -823,7 +885,7 @@ is
       return Way_Type
    is
    begin
-      if not Has_Element (Container, Position) then
+      if not Has_Element_Impl (Container, Position) then
          return Way_Type'First;
       end if;
 
@@ -847,10 +909,10 @@ is
       Child     : Cursor)
       return Boolean
    is
-      Node : Cursor := Parent (Container, Child);
+      Node : Cursor := Parent_Impl (Container, Child);
    begin
       while Node /= No_Element and then Node /= Ancestor loop
-         Node := Parent (Container, Node);
+         Node := Parent_Impl (Container, Node);
       end loop;
 
       return Node /= No_Element;
@@ -866,8 +928,8 @@ is
       Position     : Cursor)
       return Boolean
    is
-     (Has_Element (Container, Subtree_Root)
-      and then Has_Element (Container, Position)
+     (Has_Element_Impl (Container, Subtree_Root)
+      and then Has_Element_Impl (Container, Position)
       and then (Position = Subtree_Root
                 or else Is_Ancestor (Container, Subtree_Root, Position)));
 
@@ -884,8 +946,8 @@ is
    is
       C : Cursor;
    begin
-      if not Has_Element (Container, Ancestor)
-         or else not Has_Element (Container, Position)
+      if not Has_Element_Impl (Container, Ancestor)
+         or else not Has_Element_Impl (Container, Position)
       then
          return False;
       end if;
@@ -907,12 +969,12 @@ is
       Node  : Cursor;
       Count : Count_Type := 0;
    begin
-      if Has_Element (Container, Position) then
-         Node := Parent (Container, Position);
+      if Has_Element_Impl (Container, Position) then
+         Node := Parent_Impl (Container, Position);
 
          while Node /= No_Element loop
             Count := Count + 1;
-            Node  := Parent (Container, Node);
+            Node  := Parent_Impl (Container, Node);
          end loop;
       end if;
 
@@ -1002,7 +1064,7 @@ is
       Position  :        Cursor;
       Way       :        Way_Type)
    is
-      Parent_Pos : constant Cursor := Parent (Container, Position);
+      Parent_Pos : constant Cursor := Parent_Impl (Container, Position);
       New_Node   : Cursor;
    begin
       --  Create the new node
@@ -1092,7 +1154,7 @@ is
       Position  :        Cursor)
    is
    begin
-      if not Has_Element (Container, Position) then
+      if not Has_Element_Impl (Container, Position) then
          raise Constraint_Error with "Invalid cursor";
       end if;
 
@@ -1214,16 +1276,20 @@ is
      (Container : Node_Vectors.Vector;
       Node      : Index_Type) return M.Path_Type
    is
-      Result : M.Path_Type;
+      Result : M.Path_Type := M.Root;
+      Next   : Count_Type  := Node;
 
    begin
-      while Node /= 0 loop
+      while Next /= 0 loop
          declare
             Node_Acc : constant access constant Node_Type :=
-                         Node_Vectors.Constant_Reference (Container, Node)
+                         Node_Vectors.Constant_Reference (Container, Next)
                          .Element;
          begin
+            exit when Node_Acc.all.Parent = No_Element;
+
             Result := M.Insert (Result, 0, Node_Acc.all.Position);
+            Next   := Node_Acc.all.Parent.Node;
          end;
       end loop;
 
@@ -1303,21 +1369,21 @@ is
       Next : Cursor;
 
    begin
-      if not Has_Element (Container, Position) then
+      if not Has_Element_Impl (Container, Position) then
          return No_Element;
       end if;
 
-      Next := First_Child (Container, Position);
+      Next := First_Child_Impl (Container, Position);
 
       if Next = No_Element then
          Node := Position;
 
          while Node /= No_Element loop
-            Next := Next_Sibling (Container, Node);
+            Next := Next_Sibling_Impl (Container, Node);
 
             exit when Next /= No_Element;
 
-            Node := Parent (Container, Node);
+            Node := Parent_Impl (Container, Node);
          end loop;
       end if;
 

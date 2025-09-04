@@ -608,9 +608,7 @@ is
 
           --  The returned node is the first child of the node at Position
           and then (for all C in Container =>
-                      (if M.Parent (M_Path (Container, C)) =
-                          M_Path (Container, Position)
-                       then
+                      (if Position = Parent (Container, C) then
                          C = First_Child'Result
                          or else Direction (Container, First_Child'Result) <
                                    Direction (Container, C))));
@@ -620,6 +618,7 @@ is
       Position  : Cursor)
       return Element_Type
    with
+     Global => null,
      Pre => Has_Element (Container, Position)
             and then not Is_Leaf (Container, Position),
      Post => First_Child_Element'Result =
@@ -647,9 +646,7 @@ is
 
           --  The returned node is the last child of the node at Position
           and then (for all C in Container =>
-                      (if M.Parent (M_Path (Container, C)) =
-                          M_Path (Container, Position)
-                       then
+                      (if Position = Parent (Container, C) then
                          C = Last_Child'Result
                          or else Direction (Container, Last_Child'Result) >
                                    Direction (Container, C))));
@@ -659,6 +656,7 @@ is
       Position  : Cursor)
       return Element_Type
    with
+     Global => null,
      Pre => Has_Element (Container, Position)
             and then not Is_Leaf (Container, Position),
      Post => Equivalent_Elements
@@ -691,14 +689,14 @@ is
           and then M.Parent (M_Path (Container, Position)) =
                      M.Parent (M_Path (Container, Next_Sibling'Result))
 
-          --  The returned node is the last child of the node at Position
-          and then (for all C in Container =>
-                      (if M.Parent (M_Path (Container, C)) =
-                          M.Parent (M_Path (Container, Position))
-                       then
-                         C = Next_Sibling'Result
-                         or else Direction (Container, Next_Sibling'Result) >
-                                   Direction (Container, C))));
+          --  The returned node is the next sibling. I.e., there are no
+          --  sibling nodes between Position and Next_Sibling'Result
+          and then
+            (for all Way in Way_Type =>
+               (if Way < Direction (Container, Next_Sibling'Result)
+                   and then Way > Direction (Container, Position)
+                then
+                  Sibling (Container, Position, Way) = No_Element)));
 
    function Root_Element (Container : Tree) return Element_Type with
      Global => null,
