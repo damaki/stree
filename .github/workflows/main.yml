@@ -37,7 +37,7 @@ jobs:
       - name: Build Tests
         run: |
           cd tests/unit_tests
-          alr build --validation -- -XREPORT_FORMAT=junit
+          alr build --profiles=*=validation -- -XREPORT_FORMAT=junit
 
       - name: Run Tests
         run: |
