@@ -20,6 +20,9 @@ with Tree_Tests.Root_Tests;
 
 with Functional_Tree_Tests.Add_Tests;
 with Functional_Tree_Tests.Add_Parent_Tests;
+with Functional_Tree_Tests.Contains_Tests;
+with Functional_Tree_Tests.Is_Empty_Tests;
+with Functional_Tree_Tests.Length_Tests;
 
 package body Test_Suites
 is
@@ -45,6 +48,9 @@ is
 
       Functional_Tree_Tests.Add_Tests.Add_To_Suite (S.all);
       Functional_Tree_Tests.Add_Parent_Tests.Add_To_Suite (S.all);
+      Functional_Tree_Tests.Contains_Tests.Add_To_Suite (S.all);
+      Functional_Tree_Tests.Is_Empty_Tests.Add_To_Suite (S.all);
+      Functional_Tree_Tests.Length_Tests.Add_To_Suite (S.all);
 
       return S;
    end Suite;
