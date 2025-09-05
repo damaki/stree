@@ -36,8 +36,7 @@ private with Ada.Containers.Vectors;
 generic
    type Element_Type is private;
    type Way_Type is (<>);
-   with function Equivalent_Elements
-                   (Left, Right : Element_Type) return Boolean is "=";
+   with function "=" (Left, Right : Element_Type) return Boolean is <>;
 
    --  Ghost lemmas used to prove that "=" is an equivalence relation
 
@@ -659,9 +658,9 @@ is
      Global => null,
      Pre => Has_Element (Container, Position)
             and then not Is_Leaf (Container, Position),
-     Post => Equivalent_Elements
-               (Last_Child_Element'Result,
-                Element (Container, Last_Child (Container, Position)));
+     Post => Last_Child_Element'Result =
+               Element (Container, Last_Child (Container, Position)),
+     Annotate => (GNATprove, Inline_For_Proof);
 
    function Next_Sibling
      (Container : Tree;
@@ -699,12 +698,10 @@ is
                   Sibling (Container, Position, Way) = No_Element)));
 
    function Root_Element (Container : Tree) return Element_Type with
-     Global => null,
-     Pre    => not Is_Empty (Container),
-     Post   =>
-       Equivalent_Elements
-         (Root_Element'Result,
-          Element (Container, Root (Container)));
+     Global   => null,
+     Pre      => not Is_Empty (Container),
+     Post     => Root_Element'Result = Element (Container, Root (Container)),
+     Annotate => (GNATprove, Inline_For_Proof);
    --  Get the element at the root of the tree.
    --
    --  This may only be called when the tree is not empty.
@@ -885,9 +882,7 @@ is
                           M.Child (M_Path (Container, Position), Way)),
                    M.Copy_Element (New_Item))
        and then
-         Equivalent_Elements
-           (New_Item,
-            Element (Container, Child (Container, Position, Way)))
+         Element (Container, Child (Container, Position, Way)) = New_Item
 
        --  All previous elements are unchanged in the formal model
        and then M.Elements_Equal (Model (Container'Old), Model (Container))
@@ -937,10 +932,7 @@ is
        and then M.Element_Logic_Equal
                   (M.Copy_Element (New_Item),
                    M.Get (Model (Container), M_Path (Container'Old, Position)))
-       and then
-         Equivalent_Elements
-           (New_Item,
-            Element (Container, Parent (Container, Position)))
+       and then Element (Container, Parent (Container, Position)) = New_Item
 
        --  All previous nodes and elements not in the affected subtree are
        --  unchanged.
@@ -1058,9 +1050,10 @@ is
      Inline,
      Global => null,
      Pre    => Has_Element (Container, Position),
-     Post   => Equivalent_Elements
-                 (Constant_Reference'Result.all,
-                  Element (Container, Position));
+     Post   =>
+       Element_Logic_Equal
+         (Constant_Reference'Result.all,
+          M.Get (Model (Container), M_Path (Container, Position)));
 
    function Reference
      (Container : not null access Tree;
@@ -1094,7 +1087,7 @@ is
                --  equivalent to the element at the specified Position in the
                --  tree.
                and then
-                 Equivalent_Elements
+                 Element_Logic_Equal
                    (At_End (Reference'Result).all,
                     Element (At_End (Container).all, Position));
 

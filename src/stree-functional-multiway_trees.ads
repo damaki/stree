@@ -634,7 +634,9 @@ is
      Post   =>
        Length (Add_Parent'Result) = Length (Container) + 1
        and then Contains (Add_Parent'Result, Node)
-       and then Element_Logic_Equal (New_Item, Get (Add_Parent'Result, Node))
+       and then Element_Logic_Equal
+                  (Copy_Element (New_Item),
+                   Get (Add_Parent'Result, Node))
        and then Subtree_Elements_Shifted
                   (Left         => Container,
                    Right        => Add_Parent'Result,

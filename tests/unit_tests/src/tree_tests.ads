@@ -14,6 +14,7 @@ package Tree_Tests is
 
    package Integer_3Way_Trees is new Stree.Unbounded_Multiway_Trees
      (Element_Type => Integer,
-      Way_Type     => Direction);
+      Way_Type     => Direction,
+      "="          => "=");
 
 end Tree_Tests;
