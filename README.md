@@ -30,7 +30,8 @@ declare
 
    package BTrees is new Stree.Unbounded_Multiway_Trees
      (Element_Type => Integer,
-      Way_Type     => Way_Type);
+      Way_Type     => Way_Type,
+      "="          => "=");
 
    Container : BTrees.Tree;
    Node_2    : BTrees.Cursor;

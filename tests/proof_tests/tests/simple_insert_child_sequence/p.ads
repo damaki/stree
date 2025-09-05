@@ -8,7 +8,8 @@ is
 
    package P_Trees is new Stree.Unbounded_Multiway_Trees
      (Element_Type => Integer,
-      Way_Type     => Way_Type);
+      Way_Type     => Way_Type,
+      "="          => "=");
    use P_Trees;
 
    procedure Create (T : out Tree);
