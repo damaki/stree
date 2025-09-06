@@ -3,7 +3,7 @@
 --
 --  SPDX-License-Identifier: Apache-2.0
 --
-with Stree.Functional.Multiway_Trees;
+with SPARK.Containers.Functional.Multiway_Trees;
 
 package Functional_Tree_Tests is
 
@@ -12,7 +12,7 @@ package Functional_Tree_Tests is
 
    type Direction is (Left, Middle, Right);
 
-   package Integer_3Way_Trees is new Stree.Functional.Multiway_Trees
+   package Integer_3Way_Trees is new SPARK.Containers.Functional.Multiway_Trees
      (Element_Type => Integer,
       Way_Type     => Direction);
 

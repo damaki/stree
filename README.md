@@ -1,6 +1,7 @@
 # Stree
 
-Stree is a multi-way tree container library with contracts in SPARK.
+Stree is an extension of [SPARKlib](https://github.com/AdaCore/SPARKlib) which
+adds multi-way tree containers with contracts in SPARK.
 
 ## License
 
@@ -28,7 +29,7 @@ declare
    --  each node: Left and Right.
    type Way_Type is (Left, Right);
 
-   package BTrees is new Stree.Unbounded_Multiway_Trees
+   package BTrees is new SPARK.Containers.Formal.Unbounded_Multiway_Trees
      (Element_Type => Integer,
       Way_Type     => Way_Type,
       "="          => "=");

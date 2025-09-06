@@ -1,4 +1,4 @@
-with Stree.Unbounded_Multiway_Trees;
+with SPARK.Containers.Formal.Unbounded_Multiway_Trees;
 
 package P with
   SPARK_Mode => On
@@ -6,7 +6,7 @@ is
 
    type Way_Type is (Left, Middle, Right);
 
-   package P_Trees is new Stree.Unbounded_Multiway_Trees
+   package P_Trees is new SPARK.Containers.Formal.Unbounded_Multiway_Trees
      (Element_Type => Integer,
       Way_Type     => Way_Type,
       "="          => "=");

@@ -35,7 +35,7 @@ generic
    with procedure Equivalent_Elements_Transitive
      (X, Y, Z : Element_Type) is null
      with Ghost;
-package Stree.Functional.Multiway_Trees with
+package SPARK.Containers.Functional.Multiway_Trees with
   SPARK_Mode,
   Always_Terminates
 is
@@ -1183,4 +1183,4 @@ private
    function Create_Tree (New_Item : Element_Type) return Tree;
    --  Create a tree with a single root node
 
-end Stree.Functional.Multiway_Trees;
+end SPARK.Containers.Functional.Multiway_Trees;

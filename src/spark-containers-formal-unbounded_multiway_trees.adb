@@ -3,7 +3,7 @@
 --
 --  SPDX-License-Identifier: Apache-2.0
 --
-package body Stree.Unbounded_Multiway_Trees with
+package body SPARK.Containers.Formal.Unbounded_Multiway_Trees with
   SPARK_Mode => Off
 is
 
@@ -1466,4 +1466,4 @@ is
       return Node;
    end Last_Node_In_Subtree;
 
-end Stree.Unbounded_Multiway_Trees;
+end SPARK.Containers.Formal.Unbounded_Multiway_Trees;

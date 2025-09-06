@@ -3,7 +3,7 @@
 --
 --  SPDX-License-Identifier: Apache-2.0
 --
-with Stree.Unbounded_Multiway_Trees;
+with SPARK.Containers.Formal.Unbounded_Multiway_Trees;
 
 package Tree_Tests is
 
@@ -12,9 +12,10 @@ package Tree_Tests is
 
    type Direction is (Left, Middle, Right);
 
-   package Integer_3Way_Trees is new Stree.Unbounded_Multiway_Trees
-     (Element_Type => Integer,
-      Way_Type     => Direction,
-      "="          => "=");
+   package Integer_3Way_Trees is new
+     SPARK.Containers.Formal.Unbounded_Multiway_Trees
+       (Element_Type => Integer,
+        Way_Type     => Direction,
+        "="          => "=");
 
 end Tree_Tests;

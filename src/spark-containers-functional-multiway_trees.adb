@@ -5,9 +5,7 @@
 --
 with Ada.Unchecked_Deallocation;
 
-with SPARK.Containers;
-
-package body Stree.Functional.Multiway_Trees with
+package body SPARK.Containers.Functional.Multiway_Trees with
   SPARK_Mode => Off
 is
 
@@ -736,6 +734,10 @@ is
          C_T.Ref.all.Refcount := @ - 1;
 
          if C_T.Ref.all.Refcount = 0 then
+
+            --  Iterate through the tree and free each node. Note that child
+            --  nodes are visited before their parent, so child nodes will
+            --  always be freed before their parent.
 
             Node := First_Node (C_T.Ref.all.Root_Node);
 
@@ -1639,4 +1641,4 @@ is
       return Success;
    end Valid_Subtree;
 
-end Stree.Functional.Multiway_Trees;
+end SPARK.Containers.Functional.Multiway_Trees;
