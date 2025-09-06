@@ -48,7 +48,8 @@ generic
      with Ghost;
 
 package SPARK.Containers.Formal.Unbounded_Multiway_Trees with
-  SPARK_Mode => On
+  SPARK_Mode => On,
+  Always_Terminates
 is
 
    --  Contracts in this unit are meant for analysis only, not for run-time
