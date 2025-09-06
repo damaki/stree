@@ -3,10 +3,10 @@
 --
 --  SPDX-License-Identifier: Apache-2.0
 --
-with Stree.Unbounded_Multiway_Trees;
+with SPARK.Containers.Formal.Unbounded_Multiway_Trees;
 
 generic
-   with package Trees is new Stree.Unbounded_Multiway_Trees
+   with package Trees is new SPARK.Containers.Formal.Unbounded_Multiway_Trees
      (Element_Type => Integer, others => <>);
 package Support is
 

@@ -8,7 +8,7 @@ with SPARK.Containers.Functional.Maps;
 with SPARK.Containers.Parameter_Checks;
 with SPARK.Containers.Types;              use SPARK.Containers.Types;
 
-with Stree.Functional.Multiway_Trees;
+with SPARK.Containers.Functional.Multiway_Trees;
 
 private with Ada.Containers.Vectors;
 
@@ -47,7 +47,7 @@ generic
    with procedure Eq_Transitive (X, Y, Z : Element_Type) is null
      with Ghost;
 
-package Stree.Unbounded_Multiway_Trees with
+package SPARK.Containers.Formal.Unbounded_Multiway_Trees with
   SPARK_Mode => On
 is
 
@@ -130,7 +130,7 @@ is
 
       subtype Positive_Count_Type is Count_Type range 1 .. Count_Type'Last;
 
-      package M is new Stree.Functional.Multiway_Trees
+      package M is new SPARK.Containers.Functional.Multiway_Trees
         (Element_Type                   => Element_Type,
          Way_Type                       => Way_Type,
          Equivalent_Elements            => "=",
@@ -1151,4 +1151,4 @@ private
       Length    : Count_Type                  := 0;
    end record;
 
-end Stree.Unbounded_Multiway_Trees;
+end SPARK.Containers.Formal.Unbounded_Multiway_Trees;
