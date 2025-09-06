@@ -11,6 +11,7 @@ with SPARK.Containers.Types;              use SPARK.Containers.Types;
 with SPARK.Containers.Functional.Multiway_Trees;
 
 private with Ada.Containers.Vectors;
+private with SPARK.Containers.Formal.Holders;
 
 --  This package implements an unbounded multi-way tree container.
 --
@@ -1095,6 +1096,9 @@ is
 private
    pragma SPARK_Mode (Off);
 
+   package Element_Holder_Types is new Holders (Element_Type);
+   package EHT renames Element_Holder_Types;
+
    subtype Index_Type is Count_Type range 1 .. Count_Type'Last;
 
    --  The tree nodes are stored in a vector. Each vector contains references
@@ -1120,8 +1124,10 @@ private
    --  for each node deleted from the tree.
 
    type Node_Type is record
-      Element  : aliased Element_Type;
+      Element  : EHT.Holder_Type;
       --  The element stored in this node.
+      --
+      --  This is null if and only if Free is True.
 
       Parent   : Cursor;
       --  Reference to the parent node in the tree
