@@ -39,12 +39,13 @@ is
    --  Returns True if the path to nodes L_Position and R_Position are the same
    --  in trees Left and Right respectively.
 
-   procedure Alloc_From_Free_List
-     (Container : in out Tree;
-      Node      :    out Cursor);
-   --  Try and allocate a node from the free list.
-   --
-   --  If the free list is empty, then No_Element is returned.
+   procedure Alloc_Node
+     (Container       : in out Tree;
+      Node            :    out Cursor;
+      Element         :        Element_Type;
+      Parent          :        Cursor;
+      Way_From_Parent :        Way_Type);
+   --  Allocate a new node
 
    procedure Add_To_Free_List_Recursive
      (Container : in out Tree;
@@ -1022,34 +1023,12 @@ is
    is
       Node : Cursor;
    begin
-      Alloc_From_Free_List (Container, Node);
-
-      if Node /= No_Element then
-         declare
-            Node_Acc : constant not null access Node_Type :=
-                         Node_Vectors.Reference
-                           (Container.Nodes, Node.Node)
-                           .Element;
-         begin
-            Node_Acc.all := Node_Type'(Element  => Create_Holder (New_Item),
-                                       Parent   => Position,
-                                       Position => Way,
-                                       Ways     => [others => No_Element],
-                                       Free     => False);
-         end;
-      else
-         --  Free list is empty. Create a new node.
-
-         Node_Vectors.Append
-           (Container => Container.Nodes,
-            New_Item  => Node_Type'(Element  => Create_Holder (New_Item),
-                                    Parent   => Position,
-                                    Position => Way,
-                                    Ways     => [others => No_Element],
-                                    Free     => False));
-      end if;
-
-      Container.Length := Container.Length + 1;
+      Alloc_Node
+        (Container       => Container,
+         Node            => Node,
+         Element         => New_Item,
+         Parent          => Position,
+         Way_From_Parent => Way);
 
       declare
          Parent_Acc : constant not null access Node_Type :=
@@ -1075,41 +1054,12 @@ is
       Parent_Pos : constant Cursor := Parent_Impl (Container, Position);
       New_Node   : Cursor;
    begin
-      --  Create the new node
-
-      Alloc_From_Free_List (Container, New_Node);
-
-      if New_Node /= No_Element then
-         declare
-            Node_Acc : constant not null access Node_Type :=
-                         Node_Vectors.Reference
-                           (Container.Nodes, New_Node.Node)
-                          .Element;
-         begin
-            Node_Acc.all := Node_Type'
-                              (Element  => Create_Holder (New_Item),
-                               Parent   => Parent_Pos,
-                               Position => Direction (Container, Parent_Pos),
-                               Ways     => [others => No_Element],
-                               Free     => False);
-         end;
-      else
-         --  Free list is empty. Create a new node.
-
-         Node_Vectors.Append
-           (Container => Container.Nodes,
-            New_Item  => Node_Type'
-                           (Element  => Create_Holder (New_Item),
-                            Parent   => Parent_Pos,
-                            Position => Direction (Container, Parent_Pos),
-                            Ways     => [others => No_Element],
-                            Free     => False));
-
-         New_Node :=
-           Cursor'(Node => Node_Vectors.Last_Index (Container.Nodes));
-      end if;
-
-      Container.Length := Container.Length + 1;
+      Alloc_Node
+        (Container       => Container,
+         Node            => New_Node,
+         Element         => New_Item,
+         Parent          => Position,
+         Way_From_Parent => Way);
 
       --  Add the node at Position as a child of the new node
 
@@ -1222,13 +1172,16 @@ is
                                   .Element.all.Element);
    end Reference;
 
-   --------------------------
-   -- Alloc_From_Free_List --
-   --------------------------
+   ----------------
+   -- Alloc_Node --
+   ----------------
 
-   procedure Alloc_From_Free_List
-     (Container : in out Tree;
-      Node      :    out Cursor)
+   procedure Alloc_Node
+     (Container       : in out Tree;
+      Node            :    out Cursor;
+      Element         :        Element_Type;
+      Parent          :        Cursor;
+      Way_From_Parent :        Way_Type)
    is
    begin
       Node := Container.Free_List;
@@ -1240,11 +1193,44 @@ is
                            (Container.Nodes, Node.Node)
                            .Element;
          begin
-            Node_Acc.all.Free   := False;
             Container.Free_List := Node_Acc.all.Ways (Way_Type'First);
+
+            Node_Acc.all.Free     := False;
+            Node_Acc.all.Parent   := Parent;
+            Node_Acc.all.Position := Way_From_Parent;
+
+            EHT.Replace_Element (Node_Acc.all.Element, Element);
+         end;
+      else
+         --  No nodes in the free list. Create a new one.
+
+         Node_Vectors.Append
+           (Container.Nodes,
+            Node_Type'
+              (Element  => Create_Holder (Element),
+               Parent   => Parent,
+               Position => Way_From_Parent,
+               Ways     => [others => No_Element],
+               Free     => False));
+
+         Node.Node := Node_Vectors.Last_Index (Container.Nodes);
+
+         declare
+            Node_Acc : constant not null access Node_Type :=
+                         Node_Vectors.Reference
+                           (Container.Nodes, Node.Node)
+                           .Element;
+         begin
+            Container.Free_List := Node_Acc.all.Ways (Way_Type'First);
+
+            Node_Acc.all.Free     := False;
+            Node_Acc.all.Parent   := Parent;
+            Node_Acc.all.Position := Way_From_Parent;
          end;
       end if;
-   end Alloc_From_Free_List;
+
+      Container.Length := Container.Length + 1;
+   end Alloc_Node;
 
    --------------------------------
    -- Add_To_Free_List_Recursive --
