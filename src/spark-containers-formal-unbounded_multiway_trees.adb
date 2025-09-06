@@ -7,6 +7,9 @@ package body SPARK.Containers.Formal.Unbounded_Multiway_Trees with
   SPARK_Mode => Off
 is
 
+   function Create_Holder (Element : Element_Type) return EHT.Holder_Type with
+     Post => not EHT.Is_Null (Create_Holder'Result);
+
    function Get_Path
      (Container : Node_Vectors.Vector;
       Node      : Index_Type) return M.Path_Type
@@ -426,9 +429,10 @@ is
                               (Container.Nodes, Node.Node).Element;
             begin
                Result :=
-                 M.Add (Container => Result,
-                        New_Item  => Node_Acc.all.Element,
-                        New_Node  => Get_Path (Container.Nodes, Node.Node));
+                 M.Add
+                   (Container => Result,
+                    New_Item  => EHT.Element_Access (Node_Acc.all.Element).all,
+                    New_Node  => Get_Path (Container.Nodes, Node.Node));
             end;
 
             Node := Next_Impl (Container, Node);
@@ -542,7 +546,11 @@ is
       Position  : Cursor)
       return Element_Type
    is
-     (Node_Vectors.Element (Container.Nodes, Position.Node).Element);
+     (EHT.Element_Access
+        (Node_Vectors.Constant_Reference
+           (Container.Nodes, Position.Node)
+           .Element.all.Element)
+        .all);
 
    ---------------------
    -- Replace_Element --
@@ -564,7 +572,7 @@ is
                         (Container.Nodes, Position.Node)
                         .Element;
       begin
-         Node_Acc.all.Element := New_Item;
+         EHT.Replace_Element (Node_Acc.all.Element, New_Item);
       end;
    end Replace_Element;
 
@@ -990,7 +998,7 @@ is
       New_Item  :        Element_Type)
    is
    begin
-      Container.Nodes := [(Element  => New_Item,
+      Container.Nodes := [(Element  => Create_Holder (New_Item),
                            Parent   => No_Element,
                            Position => Way_Type'First,
                            Ways     => [others => No_Element],
@@ -1023,7 +1031,7 @@ is
                            (Container.Nodes, Node.Node)
                            .Element;
          begin
-            Node_Acc.all := Node_Type'(Element  => New_Item,
+            Node_Acc.all := Node_Type'(Element  => Create_Holder (New_Item),
                                        Parent   => Position,
                                        Position => Way,
                                        Ways     => [others => No_Element],
@@ -1034,7 +1042,7 @@ is
 
          Node_Vectors.Append
            (Container => Container.Nodes,
-            New_Item  => Node_Type'(Element  => New_Item,
+            New_Item  => Node_Type'(Element  => Create_Holder (New_Item),
                                     Parent   => Position,
                                     Position => Way,
                                     Ways     => [others => No_Element],
@@ -1079,7 +1087,7 @@ is
                           .Element;
          begin
             Node_Acc.all := Node_Type'
-                              (Element  => New_Item,
+                              (Element  => Create_Holder (New_Item),
                                Parent   => Parent_Pos,
                                Position => Direction (Container, Parent_Pos),
                                Ways     => [others => No_Element],
@@ -1091,7 +1099,7 @@ is
          Node_Vectors.Append
            (Container => Container.Nodes,
             New_Item  => Node_Type'
-                           (Element  => New_Item,
+                           (Element  => Create_Holder (New_Item),
                             Parent   => Parent_Pos,
                             Position => Direction (Container, Parent_Pos),
                             Ways     => [others => No_Element],
@@ -1194,9 +1202,9 @@ is
       return not null access constant Element_Type
    is
    begin
-      return Node_Vectors.Constant_Reference
-               (Container.Nodes, Position.Node)
-               .Element.all.Element'Access;
+      return EHT.Element_Access (Node_Vectors.Constant_Reference
+                                  (Container.Nodes, Position.Node)
+                                  .Element.all.Element);
    end Constant_Reference;
 
    ---------------
@@ -1209,9 +1217,9 @@ is
       return not null access Element_Type
    is
    begin
-      return Node_Vectors.Reference
-               (Container.all.Nodes, Position.Node)
-               .Element.all.Element'Access;
+      return EHT.Element_Access (Node_Vectors.Reference
+                                  (Container.all.Nodes, Position.Node)
+                                  .Element.all.Element);
    end Reference;
 
    --------------------------
@@ -1257,8 +1265,7 @@ is
          end if;
       end loop;
 
-      --  Mark as free
-
+      EHT.Finalize (Node_Acc.all.Element);
       Node_Acc.all.Free := True;
 
       --  Add this node to the free list
@@ -1465,5 +1472,16 @@ is
 
       return Node;
    end Last_Node_In_Subtree;
+
+   -------------------
+   -- Create_Holder --
+   -------------------
+
+   function Create_Holder (Element : Element_Type) return EHT.Holder_Type is
+   begin
+      return Holder : EHT.Holder_Type do
+         EHT.Replace_Element (Holder, Element);
+      end return;
+   end Create_Holder;
 
 end SPARK.Containers.Formal.Unbounded_Multiway_Trees;
