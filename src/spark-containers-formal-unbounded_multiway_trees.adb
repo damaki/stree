@@ -998,17 +998,18 @@ is
      (Container : in out Tree;
       New_Item  :        Element_Type)
    is
+      New_Node : Cursor;
    begin
-      Container.Nodes := [(Element  => Create_Holder (New_Item),
-                           Parent   => No_Element,
-                           Position => Way_Type'First,
-                           Ways     => [others => No_Element],
-                           Free     => False)];
+      Container := Empty_Tree;
 
-      Container.Root :=
-        Cursor'(Node => Node_Vectors.First_Index (Container.Nodes));
+      Alloc_Node
+        (Container       => Container,
+         Node            => New_Node,
+         Element         => New_Item,
+         Parent          => No_Element,
+         Way_From_Parent => Way_Type'First);
 
-      Container.Length := 1;
+      Container.Root := New_Node;
    end Insert_Root;
 
    ------------------
