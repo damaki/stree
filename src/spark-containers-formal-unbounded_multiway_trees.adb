@@ -47,10 +47,10 @@ is
       Way_From_Parent :        Way_Type);
    --  Allocate a new node
 
-   procedure Add_To_Free_List_Recursive
+   procedure Free_Subtree
      (Container : in out Tree;
       Node      :        Cursor);
-   --  Add a node (and its children) to the free list
+   --  Deallocate a node and its descendants.
 
    --  The following _Impl subprograms are versions of the subprograms
    --  without contracts so that they can be safely called from any subprogram
@@ -1119,7 +1119,7 @@ is
       if Position = Root (Container) then
          Container := Empty_Tree;
       else
-         --  Remove the node from its parent
+         --  Unlink the node from its parent
 
          declare
             Node_Acc   : constant not null access constant Node_Type :=
@@ -1138,7 +1138,7 @@ is
 
          --  Delete the node and its children
 
-         Add_To_Free_List_Recursive (Container, Position);
+         Free_Subtree (Container, Position);
       end if;
    end Delete;
 
@@ -1232,34 +1232,104 @@ is
       Container.Length := Container.Length + 1;
    end Alloc_Node;
 
-   --------------------------------
-   -- Add_To_Free_List_Recursive --
-   --------------------------------
+   ------------------
+   -- Free_Subtree --
+   ------------------
 
-   procedure Add_To_Free_List_Recursive
+   procedure Free_Subtree
      (Container : in out Tree;
       Node      :        Cursor)
    is
-      Node_Acc : constant not null access Node_Type :=
-                   Node_Vectors.Reference (Container.Nodes, Node.Node).Element;
+      Next_Node    : Cursor;
+      Current_Node : Cursor;
+      Parent_Node  : Cursor;
+      Child_Node   : Cursor;
    begin
-      --  Delete all child nodes
 
-      for C of Node_Acc.all.Ways loop
-         if C /= No_Element then
-            Add_To_Free_List_Recursive (Container, C);
-         end if;
+      --  Nodes in the subtree are deleted bottom-up so that the current node
+      --  being deleted is always a leaf node. For example, in the following
+      --  tree nodes are numbered in the order they are deleted:
+      --
+      --         6
+      --        / \
+      --       3   5
+      --      / \   \
+      --     1   2   4
+      --
+      --  This order guarantees that a node does not need to be visited after
+      --  it is deleted.
+
+      Current_Node := Node;
+
+      --  Start from the first leaf node
+
+      loop
+         Child_Node := First_Child_Impl (Container, Current_Node);
+         exit when Child_Node = No_Element;
+         Current_Node := Child_Node;
       end loop;
 
-      EHT.Finalize (Node_Acc.all.Element);
-      Node_Acc.all.Free := True;
+      --  Delete each node in the subtree in a bottom-up order
 
-      --  Add this node to the free list
+      while Current_Node /= No_Element loop
 
-      Node_Acc.all.Ways (Way_Type'First) := Container.Free_List;
-      Container.Free_List                := Node;
-      Container.Length                   := Container.Length - 1;
-   end Add_To_Free_List_Recursive;
+         --  Determine the next node before deleting the current one.
+         --
+         --  The next node is either the next sibling of the current node, or
+         --  the next leaf node in the next sibling of an ancestor node
+         --  (ensuring that we don't leave the subtree rooted at Node to avoid
+         --  deleting other nodes outside the target subtree).
+
+         if Current_Node = Node then
+            Next_Node := No_Element;
+
+         else
+            Parent_Node := Parent_Impl (Container, Current_Node);
+            Next_Node   := Next_Sibling_Impl (Container, Current_Node);
+
+            if Next_Node = No_Element then
+               Next_Node := Parent_Node;
+            else
+               loop
+                  Child_Node := First_Child_Impl (Container, Next_Node);
+                  exit when Child_Node = No_Element;
+                  Next_Node := Child_Node;
+               end loop;
+            end if;
+         end if;
+
+         --  Now delete the node.
+         --
+         --  If the node is the last element in the vector, then we can simply
+         --  shrink the vector.
+         --
+         --  Otherwise, if the node is in the middle of the vector, then we
+         --  cannot delete it from the vector since it will shift the positions
+         --  of all other elements after it. Instead, we maintain a "free" list
+         --  of such nodes that can be reused the next time a node is
+         --  allocated.
+
+         if Current_Node.Node = Node_Vectors.Last_Index (Container.Nodes) then
+            Node_Vectors.Delete_Last (Container.Nodes);
+         else
+            declare
+               Node_Acc : constant not null access Node_Type :=
+                           Node_Vectors.Reference
+                              (Container.Nodes, Current_Node.Node)
+                              .Element;
+            begin
+               Node_Acc.all.Free := True;
+               Node_Acc.all.Ways (Way_Type'First) := Container.Free_List;
+               Container.Free_List := Current_Node;
+
+               EHT.Finalize (Node_Acc.all.Element);
+            end;
+         end if;
+
+         Container.Length := Container.Length - 1;
+         Current_Node     := Next_Node;
+      end loop;
+   end Free_Subtree;
 
    --------------
    -- Get_Path --
