@@ -229,9 +229,9 @@ is
         Ghost,
         Global => null,
         Post   =>
-          (if Mapping_Preserved'Result then
+          Mapping_Preserved'Result =
              --  Right contains all the cursors of Left
-             P.Keys_Included (Paths (Left), Paths (Right))
+            (P.Keys_Included (Paths (Left), Paths (Right))
 
              --  Mappings from cursors to paths induced by Left and Right are
              --  the same.
@@ -250,10 +250,10 @@ is
         Ghost,
         Global => null,
         Post   =>
-          (if Mapping_Preserved_Except_Subtree'Result then
+          Mapping_Preserved_Except_Subtree'Result =
              --  Right contains all the cursors of Left that are not in the
              --  subtree rooted at Position
-             (for all C of Paths (Left) =>
+            ((for all C of Paths (Left) =>
                 (if not M.In_Subtree (M_Path (Left, C),
                                       M_Path (Left, Position))
                  then P.Has_Key (Paths (Right), C)))
@@ -286,8 +286,8 @@ is
         Ghost,
         Global => null,
         Post   =>
-          (if Subtree_Mapping_Shifted'Result then
-             (for all C of Paths (Left) =>
+          Subtree_Mapping_Shifted'Result =
+            ((for all C of Paths (Left) =>
                 (if M.In_Subtree (M_Path (Left, C),
                                   Subtree_Root)
                  then P.Has_Key (Paths (Right), C)))
@@ -320,10 +320,10 @@ is
         Ghost,
         Global => null,
         Post   =>
-          (if Subtree_Remapped'Result then
+          Subtree_Remapped'Result =
              --  Right contains all the cursors of Left that are in the
              --  subtree rooted at Old_Subtree
-             (for all C of Paths (Left) =>
+            ((for all C of Paths (Left) =>
                 (if M.In_Subtree (M_Path (Left, C), Old_Subtree) then
                    P.Has_Key (Paths (Right), C)))
 
@@ -346,10 +346,10 @@ is
         Ghost,
         Global => null,
         Post   =>
-          (if Same_Mapping_Except'Result then
+          Same_Mapping_Except'Result =
              --  Right contains the same cursors of Left, except for the
              --  one node at Position.
-             P.Keys_Included_Except (Paths (Left), Paths (Right), Position)
+            (P.Keys_Included_Except (Paths (Left), Paths (Right), Position)
              and then
                P.Keys_Included_Except (Paths (Right), Paths (Left), Position)
 
@@ -370,10 +370,10 @@ is
         Ghost,
         Global => null,
         Post   =>
-          (if Same_Mapping_Except_Subtree'Result then
+          Same_Mapping_Except_Subtree'Result =
              --  Right contains all the cursors of Left, except for nodes in
              --  the subtree rooted at Position
-             (for all C of Paths (Left) =>
+            ((for all C of Paths (Left) =>
                 P.Has_Key (Paths (Right), C) =
                   not M.In_Subtree (M_Path (Left, C), M_Path (Left, Position)))
 
