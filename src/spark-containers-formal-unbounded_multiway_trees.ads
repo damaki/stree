@@ -905,12 +905,8 @@ is
        and then Root (Container) = Root (Container'Old)
 
        --  The mappings of all previous valid cursors to paths in the formal
-       --  model is the same as before, except for the addition of the new
-       --  child node.
-       and then Same_Mapping_Except
-                  (Left     => Container'Old,
-                   Right    => Container,
-                   Position => Child (Container, Position, Way));
+       --  model is the same as before.
+       and then Mapping_Preserved (Container'Old, Container);
 
    procedure Insert_Parent
      (Container : in out Tree;
