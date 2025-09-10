@@ -7,6 +7,8 @@ package body SPARK.Containers.Formal.Unbounded_Multiway_Trees with
   SPARK_Mode => Off
 is
 
+   pragma Assertion_Policy (Ignore);
+
    function Create_Holder (Element : Element_Type) return EHT.Holder_Type with
      Post => not EHT.Is_Null (Create_Holder'Result);
 

@@ -14,5 +14,5 @@ project-files = ["stree.gpr"]
 "*".Ada_Version = "Ada2022"
 
 [[depends-on]]
-gnatprove = "^14.1.1"
-gnat = "^14"
+gnatprove = "^15"
+gnat = "^15"
