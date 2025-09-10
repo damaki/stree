@@ -14,6 +14,7 @@ package Functional_Tree_Tests is
 
    package Integer_3Way_Trees is new SPARK.Containers.Functional.Multiway_Trees
      (Element_Type => Integer,
-      Way_Type     => Direction);
+      Way_Type     => Direction,
+      "="          => "=");
 
 end Functional_Tree_Tests;

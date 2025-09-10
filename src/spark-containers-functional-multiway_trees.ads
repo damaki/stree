@@ -13,6 +13,7 @@ private with SPARK.Containers.Formal.Unbounded_Ordered_Maps;
 generic
    type Element_Type is private;
    type Way_Type is (<>);
+   with function "=" (Left, Right : Element_Type) return Boolean is <>;
    with function Equivalent_Elements
                    (Left, Right : Element_Type) return Boolean is "=";
 
