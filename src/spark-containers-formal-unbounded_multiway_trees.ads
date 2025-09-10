@@ -135,6 +135,7 @@ is
       package M is new SPARK.Containers.Functional.Multiway_Trees
         (Element_Type                   => Element_Type,
          Way_Type                       => Way_Type,
+         "="                            => Element_Logic_Equal,
          Equivalent_Elements            => "=",
          Eq_Reflexive                   => Eq_Reflexive,
          Eq_Symmetric                   => Eq_Symmetric,
@@ -230,7 +231,7 @@ is
         Global => null,
         Post   =>
           Mapping_Preserved'Result =
-             --  Right contains all the cursors of Left
+            --  Right contains all the cursors of Left
             (P.Keys_Included (Paths (Left), Paths (Right))
 
              --  Mappings from cursors to paths induced by Left and Right are
