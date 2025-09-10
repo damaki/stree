@@ -1,6 +1,6 @@
 with "config/stree_config.gpr";
 
-project SPARKlib extends "sparklib_external" is
+project SPARKlib extends "sparklib_internal" is
 
    -- This project is not supposed to be used directly. Instead, copy it in
    -- your code and provide appropriate values for the object directory
@@ -11,9 +11,9 @@ project SPARKlib extends "sparklib_external" is
 
    for Object_Dir use "obj/" & stree_config.Build_Profile & "/sparklib";
 
-   for Source_Dirs use SPARKlib_External'Source_Dirs;
+   for Source_Dirs use SPARKlib_Internal'Source_Dirs;
 
-   for Excluded_Source_Files use SPARKlib_External'Excluded_Source_Files
+   for Excluded_Source_Files use SPARKlib_Internal'Excluded_Source_Files
       -- Uncomment the files you want to exclude from your project
       & (
       -- "spark-big_integers.ads",

@@ -503,7 +503,7 @@ is
 
    function Element_Logic_Equal (Left, Right : Element_Type) return Boolean is
    begin
-      SPARK.Containers.Check_Or_Fail;
+      SPARK.Check_Or_Fail;
       return Left = Right;
    end Element_Logic_Equal;
 
@@ -516,7 +516,7 @@ is
       Success : Boolean;
 
    begin
-      SPARK.Containers.Check_Or_Fail;
+      SPARK.Check_Or_Fail;
 
       if Left.Ref.Ref = null then
          return True;
@@ -558,7 +558,7 @@ is
       L, R    : Node_Access;
       Success : Boolean;
    begin
-      SPARK.Containers.Check_Or_Fail;
+      SPARK.Check_Or_Fail;
 
       --  If the root node is excluded, then the entire Tree of Left is
       --  excluded, so we are effectively comparing an empty tree.
@@ -615,7 +615,7 @@ is
       L, R    : Node_Access;
       Success : Boolean;
    begin
-      SPARK.Containers.Check_Or_Fail;
+      SPARK.Check_Or_Fail;
 
       if Left.Ref.Ref = null then
          return True;
@@ -661,7 +661,7 @@ is
       Success : Boolean;
 
    begin
-      SPARK.Containers.Check_Or_Fail;
+      SPARK.Check_Or_Fail;
 
       if Left.Ref.Ref = null then
          return True;
