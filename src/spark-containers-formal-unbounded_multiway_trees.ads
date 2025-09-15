@@ -238,6 +238,19 @@ is
                (for all C of Paths (Left) =>
                   M_Path (Left, C) = M_Path (Right, C)));
 
+      function Elements_Preserved (Left, Right : Tree) return Boolean with
+      --  Returns True if, for all cursors of Left, the element at that cursor
+      --  is equal to the element at the same cursor in Right.
+
+        Ghost,
+        Global => null,
+        Post   =>
+          Elements_Preserved'Result =
+            (for all C of Paths (Left) =>
+               P.Has_Key (Paths (Right), C)
+               and then M.Get (Model (Left), M_Path (Left, C)) =
+                          M.Get (Model (Right), M_Path (Right, C)));
+
       function Mapping_Preserved_Except_Subtree
         (Left, Right : Tree;
          Position    : Cursor) return Boolean
@@ -265,7 +278,7 @@ is
                                         M_Path (Left, Position))
                    then M_Path (Left, C) = M_Path (Right, C))));
 
-      function Subtree_Mapping_Shifted
+      function Subtree_Mapping_Shifted_Down
         (Left, Right  : Tree;
          Subtree_Root : M.Path_Type;
          Way          : Way_Type) return Boolean
@@ -285,7 +298,39 @@ is
         Ghost,
         Global => null,
         Post   =>
-          Subtree_Mapping_Shifted'Result =
+          Subtree_Mapping_Shifted_Down'Result =
+            ((for all C of Paths (Left) =>
+                (if M.In_Subtree (M_Path (Left, C), Subtree_Root) then
+                   P.Has_Key (Paths (Right), C)))
+
+             and then
+               (for all C of Paths (Left) =>
+                  (if M.In_Subtree (M_Path (Left, C), Subtree_Root) then
+                     M_Path (Right, C) =
+                       M.Insert (Path  => M_Path (Left, C),
+                                 After => M.Length (Subtree_Root),
+                                 Value => Way))));
+
+      function Subtree_Mapping_Shifted_Up
+        (Left, Right  : Tree;
+         Subtree_Root : M.Path_Type) return Boolean
+      --  Returns True if all cursors of Left that are in the subtree rooted at
+      --  Subtree_Root are shifted up by one position.
+      --
+      --  For example, given:
+      --   * a binary tree with ways L and R; and
+      --   * Subtree_Root = [L, L, L].
+      --
+      --  then the path to the subtree is remapped to [L, L] so that an
+      --  arbitrary cursor in the subtree, e.g. previously mapping to
+      --  [L, L, L, R, R], is remapped to [L, L, R, R].
+
+      with
+        Ghost,
+        Global => null,
+        Pre    => M.Length (Subtree_Root) > 0,
+        Post   =>
+          Subtree_Mapping_Shifted_Up'Result =
             ((for all C of Paths (Left) =>
                 (if M.In_Subtree (M_Path (Left, C),
                                   Subtree_Root)
@@ -296,9 +341,8 @@ is
                   (if M.In_Subtree (M_Path (Left, C),
                                     Subtree_Root)
                    then M_Path (Right, C) =
-                          M.Insert (Path  => M_Path (Left, C),
-                                    After => M.Length (Subtree_Root),
-                                    Value => Way))));
+                          M.Remove (Path  => M_Path (Left, C),
+                                    Index => M.Length (Subtree_Root)))));
 
       function Subtree_Remapped
         (Left, Right : Tree;
@@ -775,7 +819,8 @@ is
    with
      Inline,
      Global => null,
-     Pre    => Has_Element (Container, Position),
+     Pre    => Has_Element (Container, Position)
+               and then not Is_Root (Container, Position),
      Post   =>
        Direction'Result = M.Way_From_Parent (M_Path (Container, Position));
    --  Get the direction (way) to the node at the given Position from its
@@ -888,8 +933,11 @@ is
        --  All previous elements are unchanged in the formal model
        and then M.Elements_Equal (Model (Container'Old), Model (Container))
 
+       --  Cursors map to the same elements
+       and then Elements_Preserved (Container'Old, Container)
+
        and then
-         M.Nodes_Included_Except_Subtree
+         M.Nodes_Included_Except
            (Left          => Model (Container),
             Right         => Model (Container'Old),
             Excluded_Node => M.Child (M_Path (Container'Old, Position), Way))
@@ -946,6 +994,9 @@ is
                    Subtree_Root => M_Path (Container'Old, Position),
                    Way          => Way)
 
+       --  Cursors map to the same elements
+       and then Elements_Preserved (Container'Old, Container)
+
        --  The root of the tree is unchanged, unless the node at Position was
        --  the root in which case the new parent node becomes the root.
        and then
@@ -967,14 +1018,22 @@ is
                   (Left     => Container'Old,
                    Right    => Container,
                    Position => Position)
+       and then Mapping_Preserved_Except_Subtree
+                  (Left     => Container,
+                   Right    => Container'Old,
+                   Position => Parent (Container, Position))
 
        --  Cursors in the affected subtree are remapped to new paths in the
        --  formal model as a result of the insertion of the new parent node.
-       and then Subtree_Mapping_Shifted
+       and then Subtree_Mapping_Shifted_Down
                   (Left         => Container'Old,
                    Right        => Container,
                    Subtree_Root => M_Path (Container'Old, Position),
                    Way          => Way)
+       and then Subtree_Mapping_Shifted_Up
+                  (Left         => Container,
+                   Right        => Container'Old,
+                   Subtree_Root => M_Path (Container, Position))
 
        --  Nodes that were ancestors of other nodes are still their ancestors
        --  in the updated tree.
@@ -1020,7 +1079,10 @@ is
        and then Same_Mapping_Except_Subtree
                   (Left     => Container'Old,
                    Right    => Container,
-                   Position => Position);
+                   Position => Position)
+
+       --  Cursors map to the same elements
+       and then Elements_Preserved (Container, Container'Old);
    --  Delete a node from the tree.
    --
    --  If the node has any child nodes then they are also deleted.

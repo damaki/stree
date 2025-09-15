@@ -550,6 +550,21 @@ is
                               Right_Subtree => Left_Subtree)),
      Annotate => (GNATprove, Inline_For_Proof);
 
+   function Nodes_Included_Except
+     (Left          : Tree;
+      Right         : Tree;
+      Excluded_Node : Path_Type) return Boolean
+   with
+     Global => null,
+     Post   =>
+       Nodes_Included_Except'Result =
+         (for all Node of Left =>
+            (if Node /= Excluded_Node then
+               Contains (Right, Node))),
+     Annotate => (GNATprove, Inline_For_Proof);
+   --  Returns True if Left contains only nodes of Right, except for
+   --  Excluded_Node.
+
    function Nodes_Included_Except_Subtree
      (Left          : Tree;
       Right         : Tree;
@@ -617,7 +632,7 @@ is
        and then Element_Logic_Equal (Get (Add'Result, New_Node),
                                      Copy_Element (New_Item))
        and then Elements_Equal (Container, Add'Result)
-       and then Nodes_Included_Except_Subtree (Add'Result, Container, New_Node)
+       and then Nodes_Included_Except (Add'Result, Container, New_Node)
        and then Is_Leaf (Add'Result, New_Node);
 
    function Add_Parent

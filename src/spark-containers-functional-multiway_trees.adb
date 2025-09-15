@@ -1269,6 +1269,17 @@ is
    function Nodes_Included (Left, Right : Tree) return Boolean is
      (Nodes_Included_In_Subtrees (Left, Right, Root, Root));
 
+   ---------------------------
+   -- Nodes_Included_Except --
+   ---------------------------
+
+   function Nodes_Included_Except
+     (Left          : Tree;
+      Right         : Tree;
+      Excluded_Node : Path_Type) return Boolean
+   is
+      (Nodes_Included_Except_Subtree (Left, Right, Excluded_Node));
+
    -----------------------------------
    -- Nodes_Included_Except_Subtree --
    -----------------------------------
