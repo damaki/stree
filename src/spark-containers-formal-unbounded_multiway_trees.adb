@@ -282,11 +282,11 @@ is
          return True;
       end Same_Mapping_Except_Subtree;
 
-      -----------------------------
-      -- Subtree_Mapping_Shifted --
-      -----------------------------
+      ----------------------------------
+      -- Subtree_Mapping_Shifted_Down --
+      ----------------------------------
 
-      function Subtree_Mapping_Shifted
+      function Subtree_Mapping_Shifted_Down
         (Left, Right  : Tree;
          Subtree_Root : M.Path_Type;
          Way          : Way_Type) return Boolean
@@ -296,6 +296,20 @@ is
            Right       => Right,
            Old_Subtree => Subtree_Root,
            New_Subtree => M.Child (Subtree_Root, Way)));
+
+      --------------------------------
+      -- Subtree_Mapping_Shifted_Up --
+      --------------------------------
+
+      function Subtree_Mapping_Shifted_Up
+        (Left, Right  : Tree;
+         Subtree_Root : M.Path_Type) return Boolean
+      is
+        (Subtree_Remapped
+          (Left        => Left,
+           Right       => Right,
+           Old_Subtree => Subtree_Root,
+           New_Subtree => M.Parent (Subtree_Root)));
 
       ----------------------
       -- Subtree_Remapped --
@@ -354,6 +368,43 @@ is
 
          return (L_Node = L_Last) and then (R_Node = R_Last);
       end Subtree_Remapped;
+
+      ------------------------
+      -- Elements_Preserved --
+      ------------------------
+
+      function Elements_Preserved (Left, Right : Tree) return Boolean is
+         C : Cursor;
+      begin
+         C := Root (Left);
+
+         while C /= No_Element loop
+            if not Has_Element_Impl (Right, C) then
+               return False;
+            end if;
+
+            declare
+               L : constant not null access constant Element_Type :=
+                     EHT.Element_Access
+                       (Node_Vectors.Constant_Reference
+                          (Left.Nodes, C.Node)
+                          .Element.all.Element);
+               R : constant not null access constant Element_Type :=
+                     EHT.Element_Access
+                       (Node_Vectors.Constant_Reference
+                          (Right.Nodes, C.Node)
+                          .Element.all.Element);
+            begin
+               if L.all /= R.all then
+                  return False;
+               end if;
+            end;
+
+            C := Next_Impl (Left, C);
+         end loop;
+
+         return True;
+      end Elements_Preserved;
 
       ------------------------
       -- Ancestry_Preserved --
