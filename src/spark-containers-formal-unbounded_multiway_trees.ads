@@ -492,6 +492,19 @@ is
                    then S.Get (Positions'Result, C1) <
                           S.Get (Positions'Result, C2))));
 
+      function Position_Of
+        (Container : Tree;
+         Position  : Cursor) return Positive_Count_Type
+      --  Get the position of a cursor in the iteration sequence
+
+      is
+        (S.Get (Positions (Container), Position))
+      with
+        Ghost,
+        Global   => null,
+        Pre      => P.Has_Key (Paths (Container), Position),
+        Annotate => (GNATprove, Inline_For_Proof);
+
    end Formal_Model;
    use Formal_Model;
    use type M.Path_Type;
