@@ -436,11 +436,13 @@ is
         Post   =>
           Ancestry_Preserved'Result =
             (for all C1 of Paths (Left) =>
-               (for all C2 of Paths (Left) =>
-                  (if M_Path (Left, C1) < M_Path (Left, C2) then
-                     P.Has_Key (Paths (Right), C1)
-                     and then P.Has_Key (Paths (Right), C2)
-                     and then M_Path (Right, C1) < M_Path (Right, C2)))),
+               P.Has_Key (Paths (Right), C1)
+               and then M_Path (Left, C1) <= M_Path (Right, C1)
+               and then
+                 (for all C2 of Paths (Left) =>
+                    (if M_Path (Left, C1) <= M_Path (Left, C2) then
+                       P.Has_Key (Paths (Right), C2)
+                       and then M_Path (Right, C1) <= M_Path (Right, C2)))),
         Annotate => (GNATprove, Inline_For_Proof);
 
       ----------------------
