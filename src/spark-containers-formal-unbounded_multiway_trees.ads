@@ -987,6 +987,7 @@ is
        and then Has_Element (Container, Parent (Container, Position))
        and then M_Path (Container, Parent (Container, Position)) =
                 M_Path (Container'Old, Position)
+       and then Direction (Container, Position) = Way
 
        --  The element at the new node is equivalent to New_Item
        and then M.Element_Logic_Equal
