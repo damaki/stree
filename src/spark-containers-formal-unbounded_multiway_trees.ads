@@ -511,6 +511,14 @@ is
    use Formal_Model;
    use type M.Path_Type;
 
+   overriding
+   function "=" (Left, Right : Tree) return Boolean with
+     Global => null,
+     Post   => "="'Result =
+                 (M.Same_Nodes (Model (Left), Model (Right))
+                  and then Mapping_Preserved (Left, Right)
+                  and then Mapping_Preserved (Left => Right, Right => Left));
+
    function Is_Empty (Container : Tree) return Boolean with
      Global   => null,
      Post     => Is_Empty'Result = M.Is_Empty (Model (Container)),

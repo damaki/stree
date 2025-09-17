@@ -532,6 +532,51 @@ is
 
    end Formal_Model;
 
+   ---------
+   -- "=" --
+   ---------
+
+   overriding
+   function "=" (Left, Right : Tree) return Boolean is
+      L_C, R_C : Cursor;
+
+   begin
+      if Length (Left) /= Length (Right) then
+         return False;
+      end if;
+
+      L_C := First_Impl (Left);
+      R_C := First_Impl (Right);
+
+      while L_C /= No_Element loop
+         if R_C /= L_C then
+            return False;
+         end if;
+
+         declare
+            L_E : constant not null access constant Node_Type :=
+                    Node_Vectors.Constant_Reference
+                      (Left.Nodes, L_C.Node)
+                      .Element;
+            R_E : constant not null access constant Node_Type :=
+                    Node_Vectors.Constant_Reference
+                      (Right.Nodes, R_C.Node)
+                      .Element;
+         begin
+            if EHT.Element_Access (L_E.all.Element).all /=
+               EHT.Element_Access (R_E.all.Element).all
+            then
+               return False;
+            end if;
+         end;
+
+         L_C := Next_Impl (Left,  L_C);
+         R_C := Next_Impl (Right, R_C);
+      end loop;
+
+      return R_C = No_Element;
+   end "=";
+
    ----------------
    -- Empty_Tree --
    ----------------
