@@ -261,6 +261,7 @@ is
       with
         Ghost,
         Global => null,
+        Pre    => P.Has_Key (Paths (Left), Position),
         Post   =>
           Mapping_Preserved_Except_Subtree'Result =
              --  Right contains all the cursors of Left that are not in the
