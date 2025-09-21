@@ -1135,8 +1135,7 @@ is
                           (Container.Nodes, Position.Node)
                           .Element;
       begin
-         Parent_Acc.all.Ways (Way) :=
-           Cursor'(Node => Node_Vectors.Last_Index (Container.Nodes));
+         Parent_Acc.all.Ways (Way) := Node;
       end;
    end Insert_Child;
 
@@ -1153,40 +1152,13 @@ is
       Parent_Pos : constant Cursor := Parent_Impl (Container, Position);
       New_Node   : Cursor;
    begin
+
       Alloc_Node
         (Container       => Container,
          Node            => New_Node,
          Element         => New_Item,
-         Parent          => Position,
-         Way_From_Parent => Way);
-
-      --  Add the node at Position as a child of the new node
-
-      declare
-         New_Node_Acc : constant not null access Node_Type :=
-                          Node_Vectors.Reference
-                            (Container.Nodes, New_Node.Node)
-                            .Element;
-      begin
-         New_Node_Acc.Ways (Way) := Position;
-      end;
-
-      --  Replace Position with New_Node as a child of the parent
-
-      declare
-         Parent_Acc : constant not null access Node_Type :=
-                        Node_Vectors.Reference
-                          (Container.Nodes, Parent_Pos.Node)
-                          .Element;
-      begin
-         for W of Parent_Acc.all.Ways loop
-            if W = Position then
-               W := Cursor'(Node => Node_Vectors.Last_Index (Container.Nodes));
-            end if;
-         end loop;
-      end;
-
-      --  Set New_Node as the parent of Position
+         Parent          => Parent_Pos,
+         Way_From_Parent => Direction (Container, Position));
 
       declare
          Position_Acc : constant not null access Node_Type :=
@@ -1194,12 +1166,38 @@ is
                           (Container.Nodes, Position.Node)
                           .Element;
       begin
-         Position_Acc.all.Parent := New_Node;
-      end;
 
-      if Parent_Pos = No_Element then
-         Container.Root := New_Node;
-      end if;
+         --  Add the node at Position as a child of the new node
+
+         declare
+            New_Node_Acc : constant not null access Node_Type :=
+                           Node_Vectors.Reference
+                              (Container.Nodes, New_Node.Node)
+                              .Element;
+         begin
+            New_Node_Acc.Ways (Way) := Position;
+         end;
+
+         --  Replace Position with New_Node as a child of the parent
+
+         if Parent_Pos = No_Element then
+            Container.Root := New_Node;
+         else
+            declare
+               Parent_Acc : constant not null access Node_Type :=
+                              Node_Vectors.Reference
+                              (Container.Nodes, Parent_Pos.Node)
+                              .Element;
+            begin
+               Parent_Acc.all.Ways (Position_Acc.all.Position) := New_Node;
+            end;
+         end if;
+
+         --  Set New_Node as the parent of Position
+
+         Position_Acc.all.Parent   := New_Node;
+         Position_Acc.all.Position := Way;
+      end;
    end Insert_Parent;
 
    ------------
@@ -1294,6 +1292,7 @@ is
          begin
             Container.Free_List := Node_Acc.all.Ways (Way_Type'First);
 
+            Node_Acc.all.Ways     := [others => No_Element];
             Node_Acc.all.Free     := False;
             Node_Acc.all.Parent   := Parent;
             Node_Acc.all.Position := Way_From_Parent;
@@ -1320,8 +1319,6 @@ is
                            (Container.Nodes, Node.Node)
                            .Element;
          begin
-            Container.Free_List := Node_Acc.all.Ways (Way_Type'First);
-
             Node_Acc.all.Free     := False;
             Node_Acc.all.Parent   := Parent;
             Node_Acc.all.Position := Way_From_Parent;
