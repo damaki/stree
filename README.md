@@ -3,6 +3,9 @@
 Stree is an extension of [SPARKlib](https://github.com/AdaCore/SPARKlib) which
 adds multi-way tree containers with contracts in SPARK.
 
+> [!IMPORTANT]
+> Multi-way trees are now available in [SPARKlib](https://github.com/adacore/sparklib), and is recommended instead of using this library.
+
 ## License
 
 Apache 2.0.
